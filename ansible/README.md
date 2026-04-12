@@ -55,6 +55,8 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Для production используйте фиксированные теги образов, не `latest`.
 - Для связки `course_service -> users_service` задайте `users_service_token` (или `vault_users_service_token`).
 - Сервисы деплоятся per-service compose, но в единую внешнюю сеть `{{ docker_shared_network | default('curs_net') }}`.
+- Production управляется только через Ansible (`/opt/curs/*` compose-файлы).
+- Не запускайте параллельно `docker compose` из `~/apps/curs`, чтобы не получать конфликты `container_name`.
 
 ## GHCR
 - В репозитории есть workflows сборки и публикации образов в GHCR для всех сервисов.

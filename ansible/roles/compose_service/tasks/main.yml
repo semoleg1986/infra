@@ -43,6 +43,21 @@
   changed_when: true
   when: service.enabled | default(true)
 
+- name: Run database migrations
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'compose', '-f', compose_filename, 'run', '--rm', '--no-deps', service_name] + service.migration_command }}"
+  args:
+    chdir: "{{ service.workdir }}"
+  register: migration_result
+  retries: 10
+  delay: 3
+  until: migration_result.rc == 0
+  changed_when: true
+  when:
+    - service.enabled | default(true)
+    - service.migration_command is defined
+    - service.migration_command | length > 0
+
 - name: Start service
   ansible.builtin.command:
     argv:

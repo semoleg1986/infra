@@ -71,6 +71,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Сервисы деплоятся per-service compose, но в единую внешнюю сеть `{{ docker_shared_network | default('curs_net') }}`.
 - Production управляется только через Ansible (`/opt/curs/*` compose-файлы).
 - Не запускайте параллельно `docker compose` из `~/apps/curs`, чтобы не получать конфликты `container_name`.
+- Для `auth_service`, `users_service`, `course_service`, `attribution_service` миграции запускаются автоматически (`alembic upgrade head`) перед стартом контейнера.
 
 ## GHCR
 - В репозитории есть workflows сборки и публикации образов в GHCR для всех сервисов.

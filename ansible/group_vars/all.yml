@@ -70,11 +70,15 @@ services:
     env:
       AUTH_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/auth_service{{ db_suffix }}"
       AUTH_USE_INMEMORY: "0"
-      AUTH_AUTO_CREATE_SCHEMA: "1"
+      AUTH_AUTO_CREATE_SCHEMA: "0"
       AUTH_JWT_ISSUER: auth_service
       AUTH_JWT_AUDIENCE: platform_clients
       AUTH_JWT_ACCESS_TTL_SECONDS: "3600"
       AUTH_JWT_REFRESH_TTL_SECONDS: "2592000"
+    migration_command:
+      - alembic
+      - upgrade
+      - head
     ports:
       - "8000:8000"
     healthcheck:
@@ -90,11 +94,15 @@ services:
     env:
       USERS_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/users_service{{ db_suffix }}"
       USERS_USE_INMEMORY: "0"
-      USERS_AUTO_CREATE_SCHEMA: "1"
+      USERS_AUTO_CREATE_SCHEMA: "0"
       USERS_AUTH_ISSUER: auth_service
       USERS_AUTH_AUDIENCE: platform_clients
       USERS_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
       USERS_SERVICE_TOKEN: "{{ users_service_token }}"
+    migration_command:
+      - alembic
+      - upgrade
+      - head
     ports:
       - "8002:8002"
     healthcheck:
@@ -110,13 +118,17 @@ services:
     env:
       COURSE_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/course_service{{ db_suffix }}"
       COURSE_USE_INMEMORY: "0"
-      COURSE_AUTO_CREATE_SCHEMA: "1"
+      COURSE_AUTO_CREATE_SCHEMA: "0"
       COURSE_AUTH_ISSUER: auth_service
       COURSE_AUTH_AUDIENCE: platform_clients
       COURSE_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
       COURSE_SERVICE_TOKEN: "{{ course_service_token }}"
       COURSE_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
       COURSE_USERS_SERVICE_TOKEN: "{{ users_service_token }}"
+    migration_command:
+      - alembic
+      - upgrade
+      - head
     ports:
       - "8001:8001"
     healthcheck:
@@ -132,10 +144,14 @@ services:
     env:
       ATTR_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/attribution_service{{ db_suffix }}"
       ATTR_USE_INMEMORY: "0"
-      ATTR_AUTO_CREATE_SCHEMA: "1"
+      ATTR_AUTO_CREATE_SCHEMA: "0"
       ATTR_AUTH_ISSUER: auth_service
       ATTR_AUTH_AUDIENCE: platform_clients
       ATTR_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+    migration_command:
+      - alembic
+      - upgrade
+      - head
     ports:
       - "8003:8000"
     healthcheck:

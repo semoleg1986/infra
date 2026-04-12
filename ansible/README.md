@@ -70,3 +70,9 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 
 ## Stage QA
 - Чек-лист smoke-проверки после деплоя: `STAGE_SMOKE_CHECKLIST.md`
+- Автоматизированный smoke-скрипт prod-контура: `scripts/smoke_prod.sh`
+  - Пример запуска:
+    ```bash
+    chmod +x scripts/smoke_prod.sh
+    SERVICE_TOKEN='your-internal-token' ./scripts/smoke_prod.sh
+    ```

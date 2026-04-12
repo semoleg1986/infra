@@ -1,0 +1,28 @@
+---
+# Stage overrides
+# Тестовая/предпрод среда.
+
+# GHCR
+ghcr_namespace: your-org
+ghcr_require_login: true
+ghcr_username: "{{ vault_ghcr_username }}"
+ghcr_token: "{{ vault_ghcr_token }}"
+
+# Для stage лучше фиксировать тег релиза, а не latest.
+# Пример: 2026.04.09-rc1
+service_image_tag: latest
+
+# Stage БД (отдельные базы с суффиксом _stage).
+db_host: postgres
+db_port: 5432
+db_user: postgres
+db_password: postgres
+db_suffix: _stage
+
+# Внутрисетевые адреса сервисов.
+auth_service_internal_url: http://auth_service:8000
+redis_internal_url: redis://redis:6379/0
+
+# Сервисные токены/секреты из vault.
+course_service_token: "{{ vault_course_service_token | default('stage-service-token') }}"
+users_service_token: "{{ vault_users_service_token | default(course_service_token) }}"

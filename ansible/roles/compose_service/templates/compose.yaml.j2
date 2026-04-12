@@ -1,0 +1,13 @@
+services:
+  {{ service_name }}:
+    image: {{ service.image }}:{{ service.tag }}
+    container_name: {{ service.container_name | default(service_name) }}
+    restart: unless-stopped
+    env_file:
+      - .env
+{% if service.ports is defined and service.ports | length > 0 %}
+    ports:
+{% for p in service.ports %}
+      - "{{ p }}"
+{% endfor %}
+{% endif %}

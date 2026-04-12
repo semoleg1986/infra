@@ -1,0 +1,27 @@
+---
+- name: Check docker availability
+  ansible.builtin.command: docker --version
+  register: docker_version
+  changed_when: false
+
+- name: Check docker compose availability
+  ansible.builtin.command: docker compose version
+  register: compose_version
+  changed_when: false
+
+- name: Login to GHCR when required
+  ansible.builtin.command:
+    argv:
+      - docker
+      - login
+      - "{{ ghcr_registry | default('ghcr.io') }}"
+      - -u
+      - "{{ ghcr_username }}"
+      - --password-stdin
+  args:
+    stdin: "{{ ghcr_token }}"
+  no_log: true
+  when:
+    - ghcr_require_login | default(false) | bool
+    - ghcr_username is defined
+    - ghcr_token is defined

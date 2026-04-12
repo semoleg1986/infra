@@ -1,0 +1,28 @@
+---
+- name: Show docker compose status for selected services
+  hosts: app
+  become: true
+  vars:
+    deploy_services: "{{ (services.keys() | list) if (target_services is not defined) else target_services }}"
+
+  tasks:
+    - name: Show service status
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - -f
+          - "{{ compose_filename }}"
+          - ps
+      args:
+        chdir: "{{ services[item].workdir }}"
+      loop: "{{ deploy_services }}"
+      register: compose_ps
+      changed_when: false
+
+    - name: Print status output
+      ansible.builtin.debug:
+        msg: "{{ item.stdout_lines }}"
+      loop: "{{ compose_ps.results }}"
+      loop_control:
+        label: "{{ item.item }}"

@@ -1,0 +1,24 @@
+---
+- name: Deploy selected services
+  hosts: app
+  become: true
+  vars:
+    deploy_services: "{{ (services.keys() | list) if (target_services is not defined) else target_services }}"
+
+  tasks:
+    - name: Validate selected services
+      ansible.builtin.assert:
+        that:
+          - item in services
+        fail_msg: "Сервис '{{ item }}' не найден в services (group_vars/all.yml)"
+      loop: "{{ deploy_services }}"
+
+    - name: Deploy each selected service
+      ansible.builtin.include_role:
+        name: compose_service
+      vars:
+        service_name: "{{ item }}"
+        service: "{{ services[item] }}"
+      loop: "{{ deploy_services }}"
+      loop_control:
+        label: "{{ item }}"

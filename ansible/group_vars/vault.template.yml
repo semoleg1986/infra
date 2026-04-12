@@ -1,0 +1,21 @@
+---
+# Скопируйте в group_vars/vault.yml и зашифруйте через ansible-vault.
+# Пример:
+#   cp group_vars/vault.template.yml group_vars/vault.yml
+#   ansible-vault encrypt group_vars/vault.yml
+
+# GHCR credentials
+vault_ghcr_username: "<YOUR_GHCR_USERNAME>"
+vault_ghcr_token: "<YOUR_GHCR_TOKEN>"
+
+# auth_service keys (PEM в одну строку через \n)
+vault_auth_jwt_private_key_pem: "-----BEGIN PRIVATE KEY-----\\n<PRIVATE_KEY>\\n-----END PRIVATE KEY-----"
+vault_auth_jwt_public_key_pem: "-----BEGIN PUBLIC KEY-----\\n<PUBLIC_KEY>\\n-----END PUBLIC KEY-----"
+
+# internal service secrets
+vault_course_service_token: "<COURSE_SERVICE_INTERNAL_TOKEN>"
+vault_users_service_token: "<USERS_SERVICE_INTERNAL_TOKEN>"
+
+# optional turn credentials (если будете использовать)
+vault_live_class_turn_username: "<TURN_USERNAME>"
+vault_live_class_turn_password: "<TURN_PASSWORD>"

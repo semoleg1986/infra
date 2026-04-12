@@ -1,0 +1,8 @@
+---
+- name: Ensure base directories exist
+  ansible.builtin.file:
+    path: "{{ project_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"

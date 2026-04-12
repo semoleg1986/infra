@@ -1,0 +1,15 @@
+---
+# Prod overrides
+# Рекомендуется хранить секреты в ansible-vault.
+# GHCR namespace/owner должен быть lowercase.
+# ghcr_namespace: my-org
+# ghcr_require_login: true
+# ghcr_username: "{{ vault_ghcr_username }}"
+# ghcr_token: "{{ vault_ghcr_token }}"
+#
+# Пример:
+# services:
+#   auth_service:
+#     tag: "2026.04.09"
+#     env:
+#       AUTH_JWT_PRIVATE_KEY_PEM: "{{ vault_auth_jwt_private_key_pem }}"

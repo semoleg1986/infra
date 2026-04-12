@@ -1,0 +1,176 @@
+---
+project_name: curs
+project_root: /opt/curs
+compose_filename: compose.yaml
+ghcr_registry: ghcr.io
+ghcr_namespace: your-org
+ghcr_require_login: false
+service_image_tag: latest
+
+db_user: postgres
+db_password: postgres
+db_host: postgres
+db_port: 5432
+db_suffix: ""
+
+auth_service_internal_url: http://auth_service:8000
+users_service_internal_url: http://users_service:8002
+redis_internal_url: redis://redis:6379/0
+course_service_token: dev-service-token
+users_service_token: "{{ course_service_token }}"
+
+services:
+  auth_service:
+    enabled: true
+    workdir: "{{ project_root }}/auth_service"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/auth_service"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_auth_service
+    env:
+      AUTH_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/auth_service{{ db_suffix }}"
+      AUTH_USE_INMEMORY: "0"
+      AUTH_AUTO_CREATE_SCHEMA: "1"
+      AUTH_JWT_ISSUER: auth_service
+      AUTH_JWT_AUDIENCE: platform_clients
+      AUTH_JWT_ACCESS_TTL_SECONDS: "3600"
+      AUTH_JWT_REFRESH_TTL_SECONDS: "2592000"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      path: /health
+      port: 8000
+
+  users_service:
+    enabled: true
+    workdir: "{{ project_root }}/users_service"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/users_service"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_users_service
+    env:
+      USERS_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/users_service{{ db_suffix }}"
+      USERS_USE_INMEMORY: "0"
+      USERS_AUTO_CREATE_SCHEMA: "1"
+      USERS_AUTH_ISSUER: auth_service
+      USERS_AUTH_AUDIENCE: platform_clients
+      USERS_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+      USERS_SERVICE_TOKEN: "{{ users_service_token }}"
+    ports:
+      - "8002:8002"
+    healthcheck:
+      path: /healthz
+      port: 8002
+
+  course_service:
+    enabled: true
+    workdir: "{{ project_root }}/course_service"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/course_service"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_course_service
+    env:
+      COURSE_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/course_service{{ db_suffix }}"
+      COURSE_USE_INMEMORY: "0"
+      COURSE_AUTO_CREATE_SCHEMA: "1"
+      COURSE_AUTH_ISSUER: auth_service
+      COURSE_AUTH_AUDIENCE: platform_clients
+      COURSE_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+      COURSE_SERVICE_TOKEN: "{{ course_service_token }}"
+      COURSE_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
+      COURSE_USERS_SERVICE_TOKEN: "{{ users_service_token }}"
+    ports:
+      - "8001:8001"
+    healthcheck:
+      path: /healthz
+      port: 8001
+
+  attribution_service:
+    enabled: true
+    workdir: "{{ project_root }}/attribution_service"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/attribution-service"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_attribution_service
+    env:
+      ATTR_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/attribution_service{{ db_suffix }}"
+      ATTR_USE_INMEMORY: "0"
+      ATTR_AUTO_CREATE_SCHEMA: "1"
+      ATTR_AUTH_ISSUER: auth_service
+      ATTR_AUTH_AUDIENCE: platform_clients
+      ATTR_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+    ports:
+      - "8003:8000"
+    healthcheck:
+      path: /healthz
+      port: 8003
+
+  live_class_service:
+    enabled: true
+    workdir: "{{ project_root }}/live_class_service"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/live_class_service"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_live_class_service
+    env:
+      LIVE_CLASS_HTTP_PORT: "8010"
+      LIVE_CLASS_WS_NAMESPACE: "/ws/live"
+      LIVE_CLASS_USE_INMEMORY: "1"
+      LIVE_CLASS_MAX_STUDENTS: "10"
+      LIVE_CLASS_MAX_PARTICIPANTS: "11"
+      LIVE_CLASS_AUTH_ISSUER: auth_service
+      LIVE_CLASS_AUTH_AUDIENCE: platform_clients
+      LIVE_CLASS_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+      LIVE_CLASS_REDIS_URL: "{{ redis_internal_url }}"
+      LIVE_CLASS_OUTBOX_STREAM: live_room.events
+      LIVE_CLASS_OUTBOX_BATCH_SIZE: "100"
+      LIVE_CLASS_OUTBOX_POLL_INTERVAL_MS: "1000"
+      LIVE_CLASS_DATABASE_URL: "postgresql://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/live_class_service{{ db_suffix }}"
+      LIVE_CLASS_TURN_URL: "turn:localhost:3478"
+      LIVE_CLASS_TURN_USERNAME: turn-user
+      LIVE_CLASS_TURN_PASSWORD: turn-password
+    ports:
+      - "8010:8010"
+    healthcheck:
+      path: /healthz
+      port: 8010
+
+  web_app:
+    enabled: true
+    workdir: "{{ project_root }}/web_app"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/web_app"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_web_app
+    env:
+      NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_PUBLIC_SITE_URL: "http://localhost:3000"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      path: /api/health
+      port: 3000
+
+  admin_app:
+    enabled: true
+    workdir: "{{ project_root }}/admin_app"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/admin_app"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_admin_app
+    env:
+      NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_PUBLIC_SITE_URL: "http://localhost:3001"
+    ports:
+      - "3001:3000"
+    healthcheck:
+      path: /api/health
+      port: 3001
+
+  studio_app:
+    enabled: true
+    workdir: "{{ project_root }}/studio_app"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/studio_app"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_studio_app
+    env:
+      NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_PUBLIC_SITE_URL: "http://localhost:3002"
+    ports:
+      - "3002:3000"
+    healthcheck:
+      path: /api/health
+      port: 3002

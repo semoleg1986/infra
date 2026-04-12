@@ -6,19 +6,19 @@
 - [ ] Образы подтянулись с нужным tag (не `latest` для релиза).
 
 ## 2) Health endpoints
-- [ ] `auth_service`: `GET /health` -> 200
-- [ ] `users_service`: `GET /health` -> 200
-- [ ] `course_service`: `GET /health` -> 200
-- [ ] `attribution_service`: `GET /health` -> 200
-- [ ] `live_class_service`: `GET /health` -> 200
+- [ ] `auth_service`: `GET /healthz` -> 200
+- [ ] `users_service`: `GET /healthz` -> 200
+- [ ] `course_service`: `GET /healthz` -> 200
+- [ ] `attribution_service`: `GET /healthz` -> 200
+- [ ] `live_class_service`: `GET /healthz` -> 200
 
 Пример:
 ```bash
-curl -fsS http://<stage-host>:8000/health
-curl -fsS http://<stage-host>:8002/health
-curl -fsS http://<stage-host>:8001/health
-curl -fsS http://<stage-host>:8003/health
-curl -fsS http://<stage-host>:8010/health
+curl -fsS http://<stage-host>:8000/healthz
+curl -fsS http://<stage-host>:8002/healthz
+curl -fsS http://<stage-host>:8001/healthz
+curl -fsS http://<stage-host>:8003/healthz
+curl -fsS http://<stage-host>:8010/healthz
 ```
 
 ## 3) Auth basic flow

@@ -3,6 +3,31 @@
   ansible.builtin.command: docker --version
   register: docker_version
   changed_when: false
+  failed_when: false
+
+- name: Install docker on Ubuntu when missing
+  when: docker_version.rc != 0
+  block:
+    - name: Install docker prerequisites
+      ansible.builtin.apt:
+        update_cache: true
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+
+    - name: Run official docker install script
+      ansible.builtin.shell: curl -fsSL https://get.docker.com | sh
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+- name: Ensure docker service started and enabled
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
 
 - name: Check docker compose availability
   ansible.builtin.command: docker compose version

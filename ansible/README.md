@@ -11,6 +11,8 @@
 - `roles/compose_service` — универсальная роль деплоя сервиса.
 
 ## Быстрый старт
+0. Заполнить `inventories/prod/hosts.yml` (IP, user, key) и `group_vars/vault.yml`.
+
 1. Установить коллекции:
 ```bash
 ansible-galaxy collection install -r requirements.yml
@@ -52,6 +54,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Реальные секреты храните в `ansible-vault` (`group_vars/vault.yml`).
 - Для production используйте фиксированные теги образов, не `latest`.
 - Для связки `course_service -> users_service` задайте `users_service_token` (или `vault_users_service_token`).
+- Сервисы деплоятся per-service compose, но в единую внешнюю сеть `{{ docker_shared_network | default('curs_net') }}`.
 
 ## GHCR
 - В репозитории есть workflows сборки и публикации образов в GHCR для всех сервисов.

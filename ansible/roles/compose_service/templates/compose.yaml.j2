@@ -3,11 +3,27 @@ services:
     image: {{ service.image }}:{{ service.tag }}
     container_name: {{ service.container_name | default(service_name) }}
     restart: unless-stopped
+{% if service.env is defined and service.env | length > 0 %}
     env_file:
       - .env
+{% endif %}
+{% if service.command is defined %}
+    command: {{ service.command }}
+{% endif %}
 {% if service.ports is defined and service.ports | length > 0 %}
     ports:
 {% for p in service.ports %}
       - "{{ p }}"
 {% endfor %}
 {% endif %}
+{% if service.volumes is defined and service.volumes | length > 0 %}
+    volumes:
+{% for v in service.volumes %}
+      - "{{ v }}"
+{% endfor %}
+{% endif %}
+
+networks:
+  default:
+    external: true
+    name: {{ docker_shared_network }}

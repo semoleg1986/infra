@@ -6,6 +6,17 @@
     deploy_services: "{{ (services.keys() | list) if (target_services is not defined) else target_services }}"
 
   tasks:
+    - name: Ensure shared docker network exists
+      ansible.builtin.command:
+        argv:
+          - docker
+          - network
+          - create
+          - "{{ docker_shared_network }}"
+      register: network_create
+      failed_when: network_create.rc not in [0, 1]
+      changed_when: network_create.rc == 0
+
     - name: Validate selected services
       ansible.builtin.assert:
         that:
@@ -22,3 +33,50 @@
       loop: "{{ deploy_services }}"
       loop_control:
         label: "{{ item }}"
+
+    - name: Check postgres container exists
+      ansible.builtin.command:
+        argv:
+          - docker
+          - inspect
+          - curs_postgres
+      register: postgres_container
+      changed_when: false
+      failed_when: false
+
+    - name: Wait for postgres readiness
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - curs_postgres
+          - pg_isready
+          - -U
+          - "{{ db_user }}"
+          - -d
+          - postgres
+      register: postgres_ready
+      changed_when: false
+      retries: 20
+      delay: 2
+      until: postgres_ready.rc == 0
+      when: postgres_container.rc == 0
+
+    - name: Ensure postgres databases exist
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - curs_postgres
+          - psql
+          - -U
+          - "{{ db_user }}"
+          - -d
+          - postgres
+          - -c
+          - "CREATE DATABASE \"{{ item }}\";"
+      register: create_db_result
+      changed_when: "'CREATE DATABASE' in create_db_result.stdout"
+      failed_when: false
+      loop: "{{ postgres_databases | default([]) }}"
+      when: postgres_container.rc == 0

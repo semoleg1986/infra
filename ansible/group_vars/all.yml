@@ -2,24 +2,53 @@
 project_name: curs
 project_root: /opt/curs
 compose_filename: compose.yaml
+docker_shared_network: curs_net
 ghcr_registry: ghcr.io
-ghcr_namespace: your-org
+ghcr_namespace: semoleg1986
 ghcr_require_login: false
 service_image_tag: latest
 
 db_user: postgres
 db_password: postgres
-db_host: postgres
+db_host: curs_postgres
 db_port: 5432
 db_suffix: ""
+postgres_databases:
+  - "auth_service{{ db_suffix }}"
+  - "users_service{{ db_suffix }}"
+  - "course_service{{ db_suffix }}"
+  - "attribution_service{{ db_suffix }}"
+  - "live_class_service{{ db_suffix }}"
 
-auth_service_internal_url: http://auth_service:8000
-users_service_internal_url: http://users_service:8002
-redis_internal_url: redis://redis:6379/0
+auth_service_internal_url: http://curs_auth_service:8000
+users_service_internal_url: http://curs_users_service:8002
+redis_internal_url: redis://curs_redis:6379/0
 course_service_token: dev-service-token
 users_service_token: "{{ course_service_token }}"
 
 services:
+  postgres:
+    enabled: true
+    workdir: "{{ project_root }}/postgres"
+    image: postgres
+    tag: "16-alpine"
+    container_name: curs_postgres
+    env:
+      POSTGRES_USER: "{{ db_user }}"
+      POSTGRES_PASSWORD: "{{ db_password }}"
+      POSTGRES_DB: postgres
+      TZ: UTC
+    volumes:
+      - "{{ project_root }}/volumes/postgres:/var/lib/postgresql/data"
+
+  redis:
+    enabled: true
+    workdir: "{{ project_root }}/redis"
+    image: redis
+    tag: "7-alpine"
+    container_name: curs_redis
+    env: {}
+
   auth_service:
     enabled: true
     workdir: "{{ project_root }}/auth_service"
@@ -37,7 +66,7 @@ services:
     ports:
       - "8000:8000"
     healthcheck:
-      path: /health
+      path: /healthz
       port: 8000
 
   users_service:

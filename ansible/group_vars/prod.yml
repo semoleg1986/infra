@@ -1,17 +1,7 @@
 ---
-# Prod overrides
-# Рекомендуется хранить секреты в ansible-vault.
-post_deploy_smoke_enabled: true
-
-# GHCR namespace/owner должен быть lowercase.
-# ghcr_namespace: my-org
-# ghcr_require_login: true
-# ghcr_username: "{{ vault_ghcr_username }}"
-# ghcr_token: "{{ vault_ghcr_token }}"
-#
-# Пример:
-# services:
-#   auth_service:
-#     tag: "2026.04.09"
-#     env:
-#       AUTH_JWT_PRIVATE_KEY_PEM: "{{ vault_auth_jwt_private_key_pem }}"
+ghcr_require_login: true
+ghcr_username: "{{ vault_ghcr_username }}"
+ghcr_token: "{{ vault_ghcr_token }}"
+course_service_token: "{{ vault_course_service_token }}"
+users_service_token: "{{ vault_users_service_token | default(vault_course_service_token) }}"
+db_suffix: _prod

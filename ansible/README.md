@@ -68,10 +68,11 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Реальные секреты храните в `ansible-vault` (`group_vars/vault.yml`).
 - Для production используйте фиксированные теги образов, не `latest`.
 - Для связки `course_service -> users_service` задайте `users_service_token` (или `vault_users_service_token`).
+- Для `payments_service` задайте `payments_service_token` (или `vault_payments_service_token`).
 - Сервисы деплоятся per-service compose, но в единую внешнюю сеть `{{ docker_shared_network | default('curs_net') }}`.
 - Production управляется только через Ansible (`/opt/curs/*` compose-файлы).
 - Не запускайте параллельно `docker compose` из `~/apps/curs`, чтобы не получать конфликты `container_name`.
-- Для `auth_service`, `users_service`, `course_service`, `attribution_service` миграции запускаются автоматически (`alembic upgrade head`) перед стартом контейнера.
+- Для `auth_service`, `users_service`, `course_service`, `attribution_service`, `payments_service` миграции запускаются автоматически (`alembic upgrade head`) перед стартом контейнера.
 
 ## GHCR
 - В репозитории есть workflows сборки и публикации образов в GHCR для всех сервисов.
@@ -88,6 +89,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 ## Stage QA
 - Чек-лист smoke-проверки после деплоя: `STAGE_SMOKE_CHECKLIST.md`
 - Автоматизированный smoke-скрипт prod-контура: `scripts/smoke_prod.sh`
+  - Поддерживает расширенный шаг для `payments_service` (включается автоматически при деплое `payments_service`).
   - Пример запуска:
     ```bash
     chmod +x scripts/smoke_prod.sh

@@ -4,4 +4,5 @@ ghcr_username: "{{ vault_ghcr_username }}"
 ghcr_token: "{{ vault_ghcr_token }}"
 course_service_token: "{{ vault_course_service_token }}"
 users_service_token: "{{ vault_users_service_token | default(vault_course_service_token) }}"
+payments_service_token: "{{ vault_payments_service_token | default(vault_course_service_token) }}"
 db_suffix: _prod

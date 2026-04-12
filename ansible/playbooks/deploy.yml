@@ -98,6 +98,8 @@
         AUTH_BASE_URL: "{{ smoke_auth_base_url }}"
         USERS_BASE_URL: "{{ smoke_users_base_url }}"
         COURSE_BASE_URL: "{{ smoke_course_base_url }}"
+        PAYMENTS_BASE_URL: "{{ smoke_payments_base_url }}"
+        SMOKE_PAYMENTS_ENABLED: "{{ '1' if 'payments_service' in deploy_services else '0' }}"
         ADMIN_EMAIL: "{{ smoke_admin_email }}"
         ADMIN_PASSWORD: "{{ smoke_admin_password }}"
         SERVICE_TOKEN: "{{ smoke_service_token }}"

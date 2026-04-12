@@ -2,11 +2,13 @@
 set -euo pipefail
 
 # Smoke check for production contour:
-# auth -> users (admin create teacher + internal lookup) -> course (admin create course)
+# auth -> users -> course -> payments(optional)
 
 AUTH_BASE_URL="${AUTH_BASE_URL:-http://127.0.0.1:8000}"
 USERS_BASE_URL="${USERS_BASE_URL:-http://127.0.0.1:8002}"
 COURSE_BASE_URL="${COURSE_BASE_URL:-http://127.0.0.1:8001}"
+PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
+SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
 
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
@@ -60,6 +62,14 @@ for url in \
     exit 1
   fi
 done
+
+if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
+  code="$(curl -sS -o /dev/null -w '%{http_code}' "${PAYMENTS_BASE_URL}/healthz")"
+  if [[ "${code}" != "200" ]]; then
+    log "ERROR health check failed for ${PAYMENTS_BASE_URL}/healthz: HTTP ${code}"
+    exit 1
+  fi
+fi
 
 log "Admin login"
 LOGIN_PAYLOAD="${TMP_DIR}/login.json"
@@ -136,7 +146,60 @@ if [[ -z "${COURSE_ID}" ]]; then
   exit 1
 fi
 
+if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
+  log "Create payment intent in payments_service"
+  PAYMENT_PAYLOAD="${TMP_DIR}/payment_intent.json"
+  cat > "${PAYMENT_PAYLOAD}" <<JSON
+{
+  "parent_id": "parent-1",
+  "student_id": "student-1",
+  "course_id": "course-1",
+  "idempotency_key": "smoke-pay-${SMOKE_ID}"
+}
+JSON
+
+  PAYMENT_OUT="${TMP_DIR}/payment.out.json"
+  PAYMENT_STATUS="$(request_json "POST" "${PAYMENTS_BASE_URL}/v1/parent/payments/intents" "${PAYMENT_PAYLOAD}" "${PAYMENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  assert_2xx "${PAYMENT_STATUS}" "${PAYMENT_OUT}" "create payment intent"
+
+  PAYMENT_INTENT_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("payment_intent_id",""))' "${PAYMENT_OUT}")"
+  if [[ -z "${PAYMENT_INTENT_ID}" ]]; then
+    log "ERROR create payment intent: payment_intent_id is empty"
+    cat "${PAYMENT_OUT}"
+    echo
+    exit 1
+  fi
+
+  log "Approve payment intent in payments_service"
+  APPROVE_OUT="${TMP_DIR}/payment_approve.out.json"
+  APPROVE_STATUS="$(request_json "POST" "${PAYMENTS_BASE_URL}/v1/admin/payments/${PAYMENT_INTENT_ID}/approve" "" "${APPROVE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  assert_2xx "${APPROVE_STATUS}" "${APPROVE_OUT}" "approve payment intent"
+
+  ACCESS_GRANT_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("access_grant_id",""))' "${APPROVE_OUT}")"
+  if [[ -z "${ACCESS_GRANT_ID}" ]]; then
+    log "ERROR approve payment intent: access_grant_id is empty"
+    cat "${APPROVE_OUT}"
+    echo
+    exit 1
+  fi
+
+  log "Internal access check from payments_service"
+  PAYMENTS_INTERNAL_OUT="${TMP_DIR}/payments_internal.out.json"
+  PAYMENTS_INTERNAL_STATUS="$(request_json "GET" "${PAYMENTS_BASE_URL}/internal/v1/access/course-1/student-1" "" "${PAYMENTS_INTERNAL_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
+  assert_2xx "${PAYMENTS_INTERNAL_STATUS}" "${PAYMENTS_INTERNAL_OUT}" "internal payments access check"
+
+  HAS_ACCESS="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("has_access", False)).lower())' "${PAYMENTS_INTERNAL_OUT}")"
+  if [[ "${HAS_ACCESS}" != "true" ]]; then
+    log "ERROR internal payments access check: has_access=false"
+    cat "${PAYMENTS_INTERNAL_OUT}"
+    echo
+    exit 1
+  fi
+
+  log "payments_intent_id=${PAYMENT_INTENT_ID}"
+  log "payments_access_grant_id=${ACCESS_GRANT_ID}"
+fi
+
 log "OK"
 log "teacher_id=${TEACHER_ID}"
 log "course_id=${COURSE_ID}"
-

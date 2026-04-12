@@ -19,12 +19,14 @@ postgres_databases:
   - "course_service{{ db_suffix }}"
   - "attribution_service{{ db_suffix }}"
   - "live_class_service{{ db_suffix }}"
+  - "payments_service{{ db_suffix }}"
 
 auth_service_internal_url: http://curs_auth_service:8000
 users_service_internal_url: http://curs_users_service:8002
 redis_internal_url: redis://curs_redis:6379/0
 course_service_token: dev-service-token
 users_service_token: "{{ course_service_token }}"
+payments_service_token: "{{ course_service_token }}"
 
 post_deploy_smoke_enabled: false
 post_deploy_smoke_required_services:
@@ -34,6 +36,7 @@ post_deploy_smoke_required_services:
 smoke_auth_base_url: http://127.0.0.1:8000
 smoke_users_base_url: http://127.0.0.1:8002
 smoke_course_base_url: http://127.0.0.1:8001
+smoke_payments_base_url: http://127.0.0.1:8004
 smoke_admin_email: admin@example.com
 smoke_admin_password: admin12345
 smoke_service_token: "{{ users_service_token }}"
@@ -186,6 +189,31 @@ services:
     healthcheck:
       path: /healthz
       port: 8010
+
+  payments_service:
+    enabled: true
+    workdir: "{{ project_root }}/payments_service"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/payments_service"
+    tag: "{{ service_image_tag }}"
+    container_name: curs_payments_service
+    env:
+      PAYMENTS_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/payments_service{{ db_suffix }}"
+      PAYMENTS_USE_INMEMORY: "0"
+      PAYMENTS_AUTO_CREATE_SCHEMA: "0"
+      PAYMENTS_AUTH_ISSUER: auth_service
+      PAYMENTS_AUTH_AUDIENCE: platform_clients
+      PAYMENTS_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+      PAYMENTS_SERVICE_TOKEN: "{{ payments_service_token }}"
+      PAYMENTS_DEFAULT_CURRENCY: "USD"
+    migration_command:
+      - alembic
+      - upgrade
+      - head
+    ports:
+      - "8004:8004"
+    healthcheck:
+      path: /healthz
+      port: 8004
 
   web_app:
     enabled: true

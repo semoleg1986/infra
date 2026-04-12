@@ -26,3 +26,4 @@ redis_internal_url: redis://redis:6379/0
 # Сервисные токены/секреты из vault.
 course_service_token: "{{ vault_course_service_token | default('stage-service-token') }}"
 users_service_token: "{{ vault_users_service_token | default(course_service_token) }}"
+payments_service_token: "{{ vault_payments_service_token | default(course_service_token) }}"

@@ -1,6 +1,8 @@
 ---
 # Prod overrides
 # Рекомендуется хранить секреты в ansible-vault.
+post_deploy_smoke_enabled: true
+
 # GHCR namespace/owner должен быть lowercase.
 # ghcr_namespace: my-org
 # ghcr_require_login: true

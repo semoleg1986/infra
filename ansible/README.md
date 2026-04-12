@@ -76,3 +76,17 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
     chmod +x scripts/smoke_prod.sh
     SERVICE_TOKEN='your-internal-token' ./scripts/smoke_prod.sh
     ```
+
+## Post-Deploy Smoke (Prod)
+- В `group_vars/prod.yml` включен `post_deploy_smoke_enabled: true`.
+- После `playbooks/deploy.yml` автоматически запускается `scripts/smoke_prod.sh`.
+- Smoke запускается, только если в деплое есть все сервисы из `post_deploy_smoke_required_services`:
+  - `auth_service`
+  - `users_service`
+  - `course_service`
+- Для частичного деплоя playbook печатает сообщение, что smoke пропущен.
+- Временное отключение:
+  ```bash
+  ansible-playbook -i inventories/prod/hosts.yml playbooks/deploy.yml \
+    -e post_deploy_smoke_enabled=false
+  ```

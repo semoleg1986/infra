@@ -2,6 +2,7 @@
 - name: Deploy selected services
   hosts: app
   become: true
+  gather_facts: false
   vars:
     deploy_services: "{{ (services.keys() | list) if (target_services is not defined) else target_services }}"
 
@@ -80,3 +81,35 @@
       failed_when: false
       loop: "{{ postgres_databases | default([]) }}"
       when: postgres_container.rc == 0
+
+    - name: Inform if smoke check is skipped
+      ansible.builtin.debug:
+        msg: >-
+          Post-deploy smoke check пропущен.
+          Требуемые сервисы: {{ post_deploy_smoke_required_services }}.
+          Запрошенные сервисы: {{ deploy_services }}.
+      when:
+        - post_deploy_smoke_enabled | default(false)
+        - (post_deploy_smoke_required_services | difference(deploy_services)) | length > 0
+
+    - name: Run production smoke check
+      ansible.builtin.script: "{{ playbook_dir }}/../scripts/smoke_prod.sh"
+      environment:
+        AUTH_BASE_URL: "{{ smoke_auth_base_url }}"
+        USERS_BASE_URL: "{{ smoke_users_base_url }}"
+        COURSE_BASE_URL: "{{ smoke_course_base_url }}"
+        ADMIN_EMAIL: "{{ smoke_admin_email }}"
+        ADMIN_PASSWORD: "{{ smoke_admin_password }}"
+        SERVICE_TOKEN: "{{ smoke_service_token }}"
+      register: smoke_result
+      changed_when: false
+      when:
+        - post_deploy_smoke_enabled | default(false)
+        - (post_deploy_smoke_required_services | difference(deploy_services)) | length == 0
+
+    - name: Show smoke summary
+      ansible.builtin.debug:
+        msg: "{{ smoke_result.stdout_lines | default([]) }}"
+      when:
+        - post_deploy_smoke_enabled | default(false)
+        - (post_deploy_smoke_required_services | difference(deploy_services)) | length == 0

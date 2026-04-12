@@ -49,6 +49,20 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/deploy.yml \
 ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 ```
 
+## Makefile
+- Быстрые команды:
+  ```bash
+  make deploy
+  make deploy-target SERVICE=auth_service
+  make status
+  make status-target SERVICE=users_service
+  make smoke SERVICE_TOKEN=sometokencourse
+  ```
+- По умолчанию используется `ENV=prod`. Для другого окружения:
+  ```bash
+  make ENV=stage deploy
+  ```
+
 ## Важно
 - Замените `ghcr.io/your-org/*` на реальные образы.
 - Реальные секреты храните в `ansible-vault` (`group_vars/vault.yml`).

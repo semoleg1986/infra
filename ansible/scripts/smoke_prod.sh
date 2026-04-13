@@ -53,6 +53,12 @@ assert_2xx() {
   fi
 }
 
+is_already_active_access_error() {
+  local status="$1"
+  local body_file="$2"
+  [[ "${status}" == "400" ]] && grep -q "уже существует active доступ" "${body_file}"
+}
+
 log "Health checks"
 for url in \
   "${AUTH_BASE_URL}/healthz" \
@@ -225,14 +231,19 @@ JSON
 JSON
   APPROVE_OUT="${TMP_DIR}/payment_approve.out.json"
   APPROVE_STATUS="$(request_json "POST" "${PAYMENTS_BASE_URL}/v1/admin/payments/${PAYMENT_INTENT_ID}/approve" "${APPROVE_PAYLOAD}" "${APPROVE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
-  assert_2xx "${APPROVE_STATUS}" "${APPROVE_OUT}" "approve payment intent"
+  if is_already_active_access_error "${APPROVE_STATUS}" "${APPROVE_OUT}"; then
+    log "Approve payment intent returned already-active access (idempotent OK)"
+    ACCESS_GRANT_ID="already-active"
+  else
+    assert_2xx "${APPROVE_STATUS}" "${APPROVE_OUT}" "approve payment intent"
 
-  ACCESS_GRANT_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("access_grant_id",""))' "${APPROVE_OUT}")"
-  if [[ -z "${ACCESS_GRANT_ID}" ]]; then
-    log "ERROR approve payment intent: access_grant_id is empty"
-    cat "${APPROVE_OUT}"
-    echo
-    exit 1
+    ACCESS_GRANT_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("access_grant_id",""))' "${APPROVE_OUT}")"
+    if [[ -z "${ACCESS_GRANT_ID}" ]]; then
+      log "ERROR approve payment intent: access_grant_id is empty"
+      cat "${APPROVE_OUT}"
+      echo
+      exit 1
+    fi
   fi
 
   log "Internal access check from payments_service"

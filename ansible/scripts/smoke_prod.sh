@@ -9,6 +9,7 @@ USERS_BASE_URL="${USERS_BASE_URL:-http://127.0.0.1:8002}"
 COURSE_BASE_URL="${COURSE_BASE_URL:-http://127.0.0.1:8001}"
 PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
 SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
+SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-0}"
 
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
@@ -94,8 +95,8 @@ fi
 SMOKE_ID="$(date +%s)"
 TEACHER_USER_ID="teacher-smoke-${SMOKE_ID}"
 TEACHER_EMAIL="teacher.smoke.${SMOKE_ID}@example.com"
-PAYMENT_PARENT_ID="parent-smoke-${SMOKE_ID}"
-PAYMENT_STUDENT_ID="student-smoke-${SMOKE_ID}"
+PAYMENT_PARENT_ID="${SMOKE_PAYMENTS_PARENT_ID:-parent-1}"
+PAYMENT_STUDENT_ID="${SMOKE_PAYMENTS_STUDENT_ID:-student-1}"
 
 log "Create teacher in users_service"
 TEACHER_PAYLOAD="${TMP_DIR}/teacher.json"
@@ -149,9 +150,10 @@ if [[ -z "${COURSE_ID}" ]]; then
 fi
 
 if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
-  log "Create parent in users_service"
-  PARENT_PAYLOAD="${TMP_DIR}/parent.json"
-  cat > "${PARENT_PAYLOAD}" <<JSON
+  if [[ "${SMOKE_PAYMENTS_PROVISION_RELATIONS}" == "1" ]]; then
+    log "Create parent in users_service"
+    PARENT_PAYLOAD="${TMP_DIR}/parent.json"
+    cat > "${PARENT_PAYLOAD}" <<JSON
 {
   "user_id": "${PAYMENT_PARENT_ID}",
   "email": "parent.smoke.${SMOKE_ID}@example.com",
@@ -159,13 +161,13 @@ if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
   "roles": ["parent"]
 }
 JSON
-  PARENT_OUT="${TMP_DIR}/parent.out.json"
-  PARENT_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/users" "${PARENT_PAYLOAD}" "${PARENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
-  assert_2xx "${PARENT_STATUS}" "${PARENT_OUT}" "create parent"
+    PARENT_OUT="${TMP_DIR}/parent.out.json"
+    PARENT_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/users" "${PARENT_PAYLOAD}" "${PARENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${PARENT_STATUS}" "${PARENT_OUT}" "create parent"
 
-  log "Create student in users_service"
-  STUDENT_PAYLOAD="${TMP_DIR}/student.json"
-  cat > "${STUDENT_PAYLOAD}" <<JSON
+    log "Create student in users_service"
+    STUDENT_PAYLOAD="${TMP_DIR}/student.json"
+    cat > "${STUDENT_PAYLOAD}" <<JSON
 {
   "user_id": "${PAYMENT_STUDENT_ID}",
   "email": "student.smoke.${SMOKE_ID}@example.com",
@@ -173,22 +175,23 @@ JSON
   "roles": ["student"]
 }
 JSON
-  STUDENT_OUT="${TMP_DIR}/student.out.json"
-  STUDENT_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/users" "${STUDENT_PAYLOAD}" "${STUDENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
-  assert_2xx "${STUDENT_STATUS}" "${STUDENT_OUT}" "create student"
+    STUDENT_OUT="${TMP_DIR}/student.out.json"
+    STUDENT_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/users" "${STUDENT_PAYLOAD}" "${STUDENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${STUDENT_STATUS}" "${STUDENT_OUT}" "create student"
 
-  log "Create parent-student link in users_service"
-  LINK_PAYLOAD="${TMP_DIR}/parent_student_link.json"
-  cat > "${LINK_PAYLOAD}" <<JSON
+    log "Create parent-student link in users_service"
+    LINK_PAYLOAD="${TMP_DIR}/parent_student_link.json"
+    cat > "${LINK_PAYLOAD}" <<JSON
 {
   "parent_id": "${PAYMENT_PARENT_ID}",
   "student_id": "${PAYMENT_STUDENT_ID}",
   "note": "smoke"
 }
 JSON
-  LINK_OUT="${TMP_DIR}/parent_student_link.out.json"
-  LINK_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/links" "${LINK_PAYLOAD}" "${LINK_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
-  assert_2xx "${LINK_STATUS}" "${LINK_OUT}" "create parent-student link"
+    LINK_OUT="${TMP_DIR}/parent_student_link.out.json"
+    LINK_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/links" "${LINK_PAYLOAD}" "${LINK_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${LINK_STATUS}" "${LINK_OUT}" "create parent-student link"
+  fi
 
   log "Create payment intent in payments_service"
   PAYMENT_PAYLOAD="${TMP_DIR}/payment_intent.json"

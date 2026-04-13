@@ -119,8 +119,25 @@ jobs:
                 - "8004:8004"
           YAML
 
-      - name: Start contour
-        run: docker compose -f docker-compose.e2e.yml up -d
+      - name: Start postgres
+        run: docker compose -f docker-compose.e2e.yml up -d postgres
+
+      - name: Prepare databases
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 90); do
+            if docker compose -f docker-compose.e2e.yml exec -T postgres pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d postgres -c "CREATE DATABASE auth_service_ci;" || true
+          docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d postgres -c "CREATE DATABASE users_service_ci;" || true
+          docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d postgres -c "CREATE DATABASE course_service_ci;" || true
+          docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d postgres -c "CREATE DATABASE payments_service_ci;" || true
+
+      - name: Start contour services
+        run: docker compose -f docker-compose.e2e.yml up -d auth_service users_service course_service payments_service
 
       - name: Wait for service health endpoints
         run: |

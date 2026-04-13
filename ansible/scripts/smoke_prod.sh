@@ -149,6 +149,47 @@ if [[ -z "${COURSE_ID}" ]]; then
 fi
 
 if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
+  log "Create parent in users_service"
+  PARENT_PAYLOAD="${TMP_DIR}/parent.json"
+  cat > "${PARENT_PAYLOAD}" <<JSON
+{
+  "user_id": "${PAYMENT_PARENT_ID}",
+  "email": "parent.smoke.${SMOKE_ID}@example.com",
+  "display_name": "Smoke Parent ${SMOKE_ID}",
+  "roles": ["parent"]
+}
+JSON
+  PARENT_OUT="${TMP_DIR}/parent.out.json"
+  PARENT_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/users" "${PARENT_PAYLOAD}" "${PARENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  assert_2xx "${PARENT_STATUS}" "${PARENT_OUT}" "create parent"
+
+  log "Create student in users_service"
+  STUDENT_PAYLOAD="${TMP_DIR}/student.json"
+  cat > "${STUDENT_PAYLOAD}" <<JSON
+{
+  "user_id": "${PAYMENT_STUDENT_ID}",
+  "email": "student.smoke.${SMOKE_ID}@example.com",
+  "display_name": "Smoke Student ${SMOKE_ID}",
+  "roles": ["student"]
+}
+JSON
+  STUDENT_OUT="${TMP_DIR}/student.out.json"
+  STUDENT_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/users" "${STUDENT_PAYLOAD}" "${STUDENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  assert_2xx "${STUDENT_STATUS}" "${STUDENT_OUT}" "create student"
+
+  log "Create parent-student link in users_service"
+  LINK_PAYLOAD="${TMP_DIR}/parent_student_link.json"
+  cat > "${LINK_PAYLOAD}" <<JSON
+{
+  "parent_id": "${PAYMENT_PARENT_ID}",
+  "student_id": "${PAYMENT_STUDENT_ID}",
+  "note": "smoke"
+}
+JSON
+  LINK_OUT="${TMP_DIR}/parent_student_link.out.json"
+  LINK_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/links" "${LINK_PAYLOAD}" "${LINK_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  assert_2xx "${LINK_STATUS}" "${LINK_OUT}" "create parent-student link"
+
   log "Create payment intent in payments_service"
   PAYMENT_PAYLOAD="${TMP_DIR}/payment_intent.json"
   cat > "${PAYMENT_PAYLOAD}" <<JSON

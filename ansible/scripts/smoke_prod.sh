@@ -10,6 +10,7 @@ COURSE_BASE_URL="${COURSE_BASE_URL:-http://127.0.0.1:8001}"
 PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
 SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-0}"
+SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-course-1}"
 
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
@@ -97,6 +98,7 @@ TEACHER_USER_ID="teacher-smoke-${SMOKE_ID}"
 TEACHER_EMAIL="teacher.smoke.${SMOKE_ID}@example.com"
 PAYMENT_PARENT_ID="${SMOKE_PAYMENTS_PARENT_ID:-parent-1}"
 PAYMENT_STUDENT_ID="${SMOKE_PAYMENTS_STUDENT_ID:-student-1}"
+PAYMENT_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID}"
 
 log "Create teacher in users_service"
 TEACHER_PAYLOAD="${TMP_DIR}/teacher.json"
@@ -199,7 +201,7 @@ JSON
 {
   "parent_id": "${PAYMENT_PARENT_ID}",
   "student_id": "${PAYMENT_STUDENT_ID}",
-  "course_id": "${COURSE_ID}",
+  "course_id": "${PAYMENT_COURSE_ID}",
   "idempotency_key": "smoke-pay-${SMOKE_ID}-${RANDOM}"
 }
 JSON
@@ -235,7 +237,7 @@ JSON
 
   log "Internal access check from payments_service"
   PAYMENTS_INTERNAL_OUT="${TMP_DIR}/payments_internal.out.json"
-  PAYMENTS_INTERNAL_STATUS="$(request_json "GET" "${PAYMENTS_BASE_URL}/internal/v1/access/${COURSE_ID}/${PAYMENT_STUDENT_ID}" "" "${PAYMENTS_INTERNAL_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
+  PAYMENTS_INTERNAL_STATUS="$(request_json "GET" "${PAYMENTS_BASE_URL}/internal/v1/access/${PAYMENT_COURSE_ID}/${PAYMENT_STUDENT_ID}" "" "${PAYMENTS_INTERNAL_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
   assert_2xx "${PAYMENTS_INTERNAL_STATUS}" "${PAYMENTS_INTERNAL_OUT}" "internal payments access check"
 
   HAS_ACCESS="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("has_access", False)).lower())' "${PAYMENTS_INTERNAL_OUT}")"

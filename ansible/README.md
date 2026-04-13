@@ -103,6 +103,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   - `auth_service`
   - `users_service`
   - `course_service`
+  - `payments_service`
 - Для частичного деплоя playbook печатает сообщение, что smoke пропущен.
 - Временное отключение:
   ```bash

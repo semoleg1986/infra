@@ -33,6 +33,7 @@ post_deploy_smoke_required_services:
   - auth_service
   - users_service
   - course_service
+  - payments_service
 smoke_auth_base_url: http://127.0.0.1:8000
 smoke_users_base_url: http://127.0.0.1:8002
 smoke_course_base_url: http://127.0.0.1:8001

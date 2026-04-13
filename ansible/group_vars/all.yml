@@ -29,7 +29,7 @@ course_service_token: dev-service-token
 users_service_token: "{{ course_service_token }}"
 payments_service_token: "{{ course_service_token }}"
 
-post_deploy_smoke_enabled: false
+post_deploy_smoke_enabled: true
 post_deploy_smoke_required_services:
   - auth_service
   - users_service

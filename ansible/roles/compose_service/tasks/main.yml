@@ -43,6 +43,133 @@
   changed_when: true
   when: service.enabled | default(true)
 
+- name: Read alembic version from database
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - curs_postgres
+      - psql
+      - -U
+      - "{{ db_user }}"
+      - -d
+      - "{{ service.migration_db }}"
+      - -tAc
+      - "SELECT CASE WHEN to_regclass('public.alembic_version') IS NULL THEN '' ELSE COALESCE((SELECT version_num FROM alembic_version LIMIT 1),'') END;"
+  register: alembic_version_result
+  changed_when: false
+  failed_when: false
+  when:
+    - service.enabled | default(true)
+    - service.migration_command is defined
+    - service.migration_command | length > 0
+    - service.migration_db is defined
+    - service.migration_stamp_revision is defined
+    - service.migration_stamp_probe_table is defined
+
+- name: Check base migration probe table
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - curs_postgres
+      - psql
+      - -U
+      - "{{ db_user }}"
+      - -d
+      - "{{ service.migration_db }}"
+      - -tAc
+      - "SELECT to_regclass('public.{{ service.migration_stamp_probe_table }}') IS NOT NULL;"
+  register: base_probe_result
+  changed_when: false
+  failed_when: false
+  when:
+    - service.enabled | default(true)
+    - service.migration_command is defined
+    - service.migration_command | length > 0
+    - service.migration_db is defined
+    - service.migration_stamp_revision is defined
+    - service.migration_stamp_probe_table is defined
+
+- name: Check head migration probe table
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - curs_postgres
+      - psql
+      - -U
+      - "{{ db_user }}"
+      - -d
+      - "{{ service.migration_db }}"
+      - -tAc
+      - "SELECT to_regclass('public.{{ service.migration_stamp_head_probe_table | default(service.migration_stamp_probe_table) }}') IS NOT NULL;"
+  register: head_probe_result
+  changed_when: false
+  failed_when: false
+  when:
+    - service.enabled | default(true)
+    - service.migration_command is defined
+    - service.migration_command | length > 0
+    - service.migration_db is defined
+    - service.migration_stamp_revision is defined
+    - service.migration_stamp_probe_table is defined
+
+- name: Stamp alembic to head revision when schema already at head
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ compose_filename }}"
+      - run
+      - --rm
+      - --no-deps
+      - "{{ service_name }}"
+      - alembic
+      - stamp
+      - "{{ service.migration_stamp_head_revision | default(service.migration_stamp_revision) }}"
+  args:
+    chdir: "{{ service.workdir }}"
+  changed_when: true
+  when:
+    - service.enabled | default(true)
+    - service.migration_command is defined
+    - service.migration_command | length > 0
+    - service.migration_db is defined
+    - service.migration_stamp_revision is defined
+    - service.migration_stamp_probe_table is defined
+    - (alembic_version_result.stdout | default('') | trim) == ""
+    - (head_probe_result.stdout | default('') | trim) == "t"
+
+- name: Stamp alembic to base revision when base schema exists without history
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ compose_filename }}"
+      - run
+      - --rm
+      - --no-deps
+      - "{{ service_name }}"
+      - alembic
+      - stamp
+      - "{{ service.migration_stamp_revision }}"
+  args:
+    chdir: "{{ service.workdir }}"
+  changed_when: true
+  when:
+    - service.enabled | default(true)
+    - service.migration_command is defined
+    - service.migration_command | length > 0
+    - service.migration_db is defined
+    - service.migration_stamp_revision is defined
+    - service.migration_stamp_probe_table is defined
+    - (alembic_version_result.stdout | default('') | trim) == ""
+    - (head_probe_result.stdout | default('') | trim) != "t"
+    - (base_probe_result.stdout | default('') | trim) == "t"
+
 - name: Run database migrations
   ansible.builtin.command:
     argv: "{{ ['docker', 'compose', '-f', compose_filename, 'run', '--rm', '--no-deps', service_name] + service.migration_command }}"

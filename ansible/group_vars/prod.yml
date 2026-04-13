@@ -6,3 +6,15 @@ course_service_token: "{{ vault_course_service_token }}"
 users_service_token: "{{ vault_users_service_token | default(vault_course_service_token) }}"
 payments_service_token: "{{ vault_payments_service_token | default(vault_course_service_token) }}"
 db_suffix: _prod
+
+# Явные production-теги образов (без latest) для предсказуемых откатов.
+service_image_tags:
+  auth_service: main
+  users_service: main
+  course_service: main
+  attribution_service: main
+  live_class_service: main
+  payments_service: main
+  web_app: main
+  admin_app: main
+  studio_app: main

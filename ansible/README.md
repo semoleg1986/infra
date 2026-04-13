@@ -67,12 +67,14 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Замените `ghcr.io/your-org/*` на реальные образы.
 - Реальные секреты храните в `ansible-vault` (`group_vars/vault.yml`).
 - Для production используйте фиксированные теги образов, не `latest`.
+  - Теги задаются в `group_vars/prod.yml -> service_image_tags`.
 - Для связки `course_service -> users_service` задайте `users_service_token` (или `vault_users_service_token`).
 - Для `payments_service` задайте `payments_service_token` (или `vault_payments_service_token`).
 - Сервисы деплоятся per-service compose, но в единую внешнюю сеть `{{ docker_shared_network | default('curs_net') }}`.
 - Production управляется только через Ansible (`/opt/curs/*` compose-файлы).
 - Не запускайте параллельно `docker compose` из `~/apps/curs`, чтобы не получать конфликты `container_name`.
 - Для `auth_service`, `users_service`, `course_service`, `attribution_service`, `payments_service` миграции запускаются автоматически (`alembic upgrade head`) перед стартом контейнера.
+- Перед миграцией добавлен pre-check рассинхрона (`schema есть, alembic_version пуст`) с автоматическим `alembic stamp` по сервисному revision guard.
 
 ## GHCR
 - В репозитории есть workflows сборки и публикации образов в GHCR для всех сервисов.
@@ -97,7 +99,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
     ```
 
 ## Post-Deploy Smoke (Prod)
-- В `group_vars/prod.yml` включен `post_deploy_smoke_enabled: true`.
+- В `group_vars/all.yml` включен `post_deploy_smoke_enabled: true` (при необходимости переопределяется в `group_vars/prod.yml`).
 - После `playbooks/deploy.yml` автоматически запускается `scripts/smoke_prod.sh`.
 - Smoke запускается, только если в деплое есть все сервисы из `post_deploy_smoke_required_services`:
   - `auth_service`
@@ -110,3 +112,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   ansible-playbook -i inventories/prod/hosts.yml playbooks/deploy.yml \
     -e post_deploy_smoke_enabled=false
   ```
+
+## CI E2E
+- Workflow: `.github/workflows/e2e-contour-smoke.yml`
+- Поднимает `auth_service + users_service + course_service + payments_service` из GHCR и запускает `ansible/scripts/smoke_prod.sh`.

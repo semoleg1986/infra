@@ -70,7 +70,12 @@ services:
     enabled: true
     workdir: "{{ project_root }}/auth_service"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/auth_service"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.auth_service | default(service_image_tag) }}"
+    migration_db: "auth_service{{ db_suffix }}"
+    migration_stamp_revision: "20260405_0001"
+    migration_stamp_probe_table: accounts
+    migration_stamp_head_probe_table: accounts
+    migration_stamp_head_revision: "20260405_0001"
     container_name: curs_auth_service
     env:
       AUTH_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/auth_service{{ db_suffix }}"
@@ -94,7 +99,12 @@ services:
     enabled: true
     workdir: "{{ project_root }}/users_service"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/users_service"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.users_service | default(service_image_tag) }}"
+    migration_db: "users_service{{ db_suffix }}"
+    migration_stamp_revision: "20260406_0001"
+    migration_stamp_probe_table: user_profiles
+    migration_stamp_head_probe_table: user_profiles
+    migration_stamp_head_revision: "20260406_0001"
     container_name: curs_users_service
     env:
       USERS_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/users_service{{ db_suffix }}"
@@ -118,7 +128,12 @@ services:
     enabled: true
     workdir: "{{ project_root }}/course_service"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/course_service"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.course_service | default(service_image_tag) }}"
+    migration_db: "course_service{{ db_suffix }}"
+    migration_stamp_revision: "20260406_0001"
+    migration_stamp_probe_table: course_owner_projections
+    migration_stamp_head_probe_table: course_catalog
+    migration_stamp_head_revision: "20260412_0002"
     container_name: curs_course_service
     env:
       COURSE_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/course_service{{ db_suffix }}"
@@ -144,7 +159,12 @@ services:
     enabled: true
     workdir: "{{ project_root }}/attribution_service"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/attribution-service"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.attribution_service | default(service_image_tag) }}"
+    migration_db: "attribution_service{{ db_suffix }}"
+    migration_stamp_revision: "20260412_0001"
+    migration_stamp_probe_table: referral_tokens
+    migration_stamp_head_probe_table: referral_tokens
+    migration_stamp_head_revision: "20260412_0001"
     container_name: curs_attribution_service
     env:
       ATTR_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/attribution_service{{ db_suffix }}"
@@ -167,7 +187,7 @@ services:
     enabled: true
     workdir: "{{ project_root }}/live_class_service"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/live_class_service"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.live_class_service | default(service_image_tag) }}"
     container_name: curs_live_class_service
     env:
       LIVE_CLASS_HTTP_PORT: "8010"
@@ -196,7 +216,12 @@ services:
     enabled: true
     workdir: "{{ project_root }}/payments_service"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/payments_service"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.payments_service | default(service_image_tag) }}"
+    migration_db: "payments_service{{ db_suffix }}"
+    migration_stamp_revision: "20260412_0001"
+    migration_stamp_probe_table: payment_intents
+    migration_stamp_head_probe_table: payment_intents
+    migration_stamp_head_revision: "20260412_0001"
     container_name: curs_payments_service
     env:
       PAYMENTS_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/payments_service{{ db_suffix }}"
@@ -228,7 +253,7 @@ services:
     enabled: true
     workdir: "{{ project_root }}/web_app"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/web_app"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.web_app | default(service_image_tag) }}"
     container_name: curs_web_app
     env:
       NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"
@@ -243,7 +268,7 @@ services:
     enabled: true
     workdir: "{{ project_root }}/admin_app"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/admin_app"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.admin_app | default(service_image_tag) }}"
     container_name: curs_admin_app
     env:
       NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"
@@ -258,7 +283,7 @@ services:
     enabled: true
     workdir: "{{ project_root }}/studio_app"
     image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/studio_app"
-    tag: "{{ service_image_tag }}"
+    tag: "{{ service_image_tags.studio_app | default(service_image_tag) }}"
     container_name: curs_studio_app
     env:
       NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"

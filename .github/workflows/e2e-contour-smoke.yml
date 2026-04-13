@@ -1,0 +1,144 @@
+name: E2E Contour Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ansible/**"
+      - ".github/workflows/e2e-contour-smoke.yml"
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      IMAGE_TAG: main
+      SERVICE_TOKEN: sometokencourse
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write e2e compose
+        run: |
+          cat > docker-compose.e2e.yml <<'YAML'
+          services:
+            postgres:
+              image: postgres:16-alpine
+              environment:
+                POSTGRES_USER: postgres
+                POSTGRES_PASSWORD: postgres
+                POSTGRES_DB: postgres
+              healthcheck:
+                test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+                interval: 5s
+                timeout: 3s
+                retries: 30
+
+            auth_service:
+              image: ghcr.io/semoleg1986/auth_service:${IMAGE_TAG}
+              environment:
+                AUTH_DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/auth_service_ci
+                AUTH_USE_INMEMORY: "0"
+                AUTH_AUTO_CREATE_SCHEMA: "1"
+                AUTH_JWT_ISSUER: auth_service
+                AUTH_JWT_AUDIENCE: platform_clients
+                AUTH_JWT_ACCESS_TTL_SECONDS: "3600"
+                AUTH_JWT_REFRESH_TTL_SECONDS: "2592000"
+              depends_on:
+                postgres:
+                  condition: service_healthy
+              ports:
+                - "8000:8000"
+
+            users_service:
+              image: ghcr.io/semoleg1986/users_service:${IMAGE_TAG}
+              environment:
+                USERS_DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/users_service_ci
+                USERS_USE_INMEMORY: "0"
+                USERS_AUTO_CREATE_SCHEMA: "1"
+                USERS_AUTH_ISSUER: auth_service
+                USERS_AUTH_AUDIENCE: platform_clients
+                USERS_AUTH_JWKS_URL: http://auth_service:8000/.well-known/jwks.json
+                USERS_SERVICE_TOKEN: ${SERVICE_TOKEN}
+              depends_on:
+                postgres:
+                  condition: service_healthy
+              ports:
+                - "8002:8002"
+
+            course_service:
+              image: ghcr.io/semoleg1986/course_service:${IMAGE_TAG}
+              environment:
+                COURSE_DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/course_service_ci
+                COURSE_USE_INMEMORY: "0"
+                COURSE_AUTO_CREATE_SCHEMA: "1"
+                COURSE_AUTH_ISSUER: auth_service
+                COURSE_AUTH_AUDIENCE: platform_clients
+                COURSE_AUTH_JWKS_URL: http://auth_service:8000/.well-known/jwks.json
+                COURSE_SERVICE_TOKEN: ${SERVICE_TOKEN}
+                COURSE_USERS_SERVICE_BASE_URL: http://users_service:8002
+                COURSE_USERS_SERVICE_TOKEN: ${SERVICE_TOKEN}
+              depends_on:
+                postgres:
+                  condition: service_healthy
+              ports:
+                - "8001:8001"
+
+            payments_service:
+              image: ghcr.io/semoleg1986/payments_service:${IMAGE_TAG}
+              environment:
+                PAYMENTS_DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/payments_service_ci
+                PAYMENTS_USE_INMEMORY: "0"
+                PAYMENTS_AUTO_CREATE_SCHEMA: "1"
+                PAYMENTS_INTEGRATIONS_USE_INMEMORY: "0"
+                PAYMENTS_AUTH_ISSUER: auth_service
+                PAYMENTS_AUTH_AUDIENCE: platform_clients
+                PAYMENTS_AUTH_JWKS_URL: http://auth_service:8000/.well-known/jwks.json
+                PAYMENTS_SERVICE_TOKEN: ${SERVICE_TOKEN}
+                PAYMENTS_COURSE_SERVICE_BASE_URL: http://course_service:8001
+                PAYMENTS_COURSE_SERVICE_TOKEN: ${SERVICE_TOKEN}
+                PAYMENTS_USERS_SERVICE_BASE_URL: http://users_service:8002
+                PAYMENTS_USERS_SERVICE_TOKEN: ${SERVICE_TOKEN}
+              depends_on:
+                postgres:
+                  condition: service_healthy
+              ports:
+                - "8004:8004"
+          YAML
+
+      - name: Start contour
+        run: docker compose -f docker-compose.e2e.yml up -d
+
+      - name: Run smoke
+        env:
+          AUTH_BASE_URL: http://127.0.0.1:8000
+          USERS_BASE_URL: http://127.0.0.1:8002
+          COURSE_BASE_URL: http://127.0.0.1:8001
+          PAYMENTS_BASE_URL: http://127.0.0.1:8004
+          SMOKE_PAYMENTS_ENABLED: "1"
+          SERVICE_TOKEN: ${{ env.SERVICE_TOKEN }}
+        run: |
+          chmod +x ansible/scripts/smoke_prod.sh
+          ./ansible/scripts/smoke_prod.sh
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.e2e.yml logs --no-color
+
+      - name: Stop contour
+        if: always()
+        run: docker compose -f docker-compose.e2e.yml down -v
+

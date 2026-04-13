@@ -171,8 +171,12 @@ JSON
   fi
 
   log "Approve payment intent in payments_service"
+  APPROVE_PAYLOAD="${TMP_DIR}/payment_approve.json"
+  cat > "${APPROVE_PAYLOAD}" <<JSON
+{}
+JSON
   APPROVE_OUT="${TMP_DIR}/payment_approve.out.json"
-  APPROVE_STATUS="$(request_json "POST" "${PAYMENTS_BASE_URL}/v1/admin/payments/${PAYMENT_INTENT_ID}/approve" "" "${APPROVE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  APPROVE_STATUS="$(request_json "POST" "${PAYMENTS_BASE_URL}/v1/admin/payments/${PAYMENT_INTENT_ID}/approve" "${APPROVE_PAYLOAD}" "${APPROVE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
   assert_2xx "${APPROVE_STATUS}" "${APPROVE_OUT}" "approve payment intent"
 
   ACCESS_GRANT_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("access_grant_id",""))' "${APPROVE_OUT}")"

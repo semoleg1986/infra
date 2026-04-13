@@ -94,6 +94,8 @@ fi
 SMOKE_ID="$(date +%s)"
 TEACHER_USER_ID="teacher-smoke-${SMOKE_ID}"
 TEACHER_EMAIL="teacher.smoke.${SMOKE_ID}@example.com"
+PAYMENT_PARENT_ID="parent-smoke-${SMOKE_ID}"
+PAYMENT_STUDENT_ID="student-smoke-${SMOKE_ID}"
 
 log "Create teacher in users_service"
 TEACHER_PAYLOAD="${TMP_DIR}/teacher.json"
@@ -151,10 +153,10 @@ if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
   PAYMENT_PAYLOAD="${TMP_DIR}/payment_intent.json"
   cat > "${PAYMENT_PAYLOAD}" <<JSON
 {
-  "parent_id": "parent-1",
-  "student_id": "student-1",
-  "course_id": "course-1",
-  "idempotency_key": "smoke-pay-${SMOKE_ID}"
+  "parent_id": "${PAYMENT_PARENT_ID}",
+  "student_id": "${PAYMENT_STUDENT_ID}",
+  "course_id": "${COURSE_ID}",
+  "idempotency_key": "smoke-pay-${SMOKE_ID}-${RANDOM}"
 }
 JSON
 
@@ -189,7 +191,7 @@ JSON
 
   log "Internal access check from payments_service"
   PAYMENTS_INTERNAL_OUT="${TMP_DIR}/payments_internal.out.json"
-  PAYMENTS_INTERNAL_STATUS="$(request_json "GET" "${PAYMENTS_BASE_URL}/internal/v1/access/course-1/student-1" "" "${PAYMENTS_INTERNAL_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
+  PAYMENTS_INTERNAL_STATUS="$(request_json "GET" "${PAYMENTS_BASE_URL}/internal/v1/access/${COURSE_ID}/${PAYMENT_STUDENT_ID}" "" "${PAYMENTS_INTERNAL_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
   assert_2xx "${PAYMENTS_INTERNAL_STATUS}" "${PAYMENTS_INTERNAL_OUT}" "internal payments access check"
 
   HAS_ACCESS="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("has_access", False)).lower())' "${PAYMENTS_INTERNAL_OUT}")"

@@ -24,10 +24,12 @@ postgres_databases:
 auth_service_internal_url: http://curs_auth_service:8000
 users_service_internal_url: http://curs_users_service:8002
 course_service_internal_url: http://curs_course_service:8001
+attribution_service_internal_url: http://curs_attribution_service:8000
 redis_internal_url: redis://curs_redis:6379/0
 course_service_token: dev-service-token
 users_service_token: "{{ course_service_token }}"
 payments_service_token: "{{ course_service_token }}"
+attribution_service_token: "{{ course_service_token }}"
 
 post_deploy_smoke_enabled: true
 post_deploy_smoke_required_services:
@@ -173,6 +175,7 @@ services:
       ATTR_AUTH_ISSUER: auth_service
       ATTR_AUTH_AUDIENCE: platform_clients
       ATTR_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+      ATTR_SERVICE_TOKEN: "{{ attribution_service_token }}"
     migration_command:
       - alembic
       - upgrade
@@ -239,6 +242,9 @@ services:
       PAYMENTS_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
       PAYMENTS_USERS_SERVICE_TOKEN: "{{ users_service_token }}"
       PAYMENTS_USERS_SERVICE_TIMEOUT_SECONDS: "2"
+      PAYMENTS_ATTR_SERVICE_BASE_URL: "{{ attribution_service_internal_url }}"
+      PAYMENTS_ATTR_SERVICE_TOKEN: "{{ attribution_service_token }}"
+      PAYMENTS_ATTR_SERVICE_TIMEOUT_SECONDS: "2"
     migration_command:
       - alembic
       - upgrade

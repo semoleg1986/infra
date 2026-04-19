@@ -59,6 +59,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   make smoke SERVICE_TOKEN=sometokencourse
   make backup-postgres
   make restore-drill BACKUP_DIR=~/backups/postgres/<timestamp>
+  make ops-check
   ```
 - По умолчанию используется `ENV=prod`. Для другого окружения:
   ```bash
@@ -147,5 +148,22 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
    ```bash
    for db in auth_service_prod_drill users_service_prod_drill course_service_prod_drill attribution_service_prod_drill live_class_service_prod_drill payments_service_prod_drill; do
      sudo docker exec curs_postgres psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS \"$db\";"
-   done
-   ```
+  done
+  ```
+
+## Ops Baseline Check
+- Скрипт: `scripts/ops_baseline_check.sh`
+- Команда:
+  ```bash
+  make ops-check
+  ```
+- Что проверяет:
+  - заполнение `/` (warn/crit пороги),
+  - статус docker-контейнеров (`Up`/`unhealthy`),
+  - HTTP health endpoints сервисов,
+  - признаки 5xx/Traceback в последних логах контейнеров.
+
+- Полезные overrides:
+  ```bash
+  DISK_WARN_PCT=85 DISK_CRIT_PCT=92 LOG_5XX_WARN_COUNT=3 make ops-check
+  ```

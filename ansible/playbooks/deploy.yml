@@ -7,6 +7,24 @@
     deploy_services: "{{ (services.keys() | list) if (target_services is not defined) else target_services }}"
 
   tasks:
+    - name: Ensure ops cron log file exists
+      ansible.builtin.file:
+        path: "{{ ops_cron_log_file }}"
+        state: touch
+        owner: root
+        group: root
+        mode: "0644"
+      when: ops_cron_enabled | default(false)
+
+    - name: Install ops cron schedule
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/curs-ops.cron.j2"
+        dest: /etc/cron.d/curs-ops
+        owner: root
+        group: root
+        mode: "0644"
+      when: ops_cron_enabled | default(false)
+
     - name: Ensure shared docker network exists
       ansible.builtin.command:
         argv:

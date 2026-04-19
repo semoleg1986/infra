@@ -47,6 +47,15 @@ smoke_admin_email: admin@example.com
 smoke_admin_password: admin12345
 smoke_service_token: "{{ users_service_token }}"
 
+ops_cron_enabled: false
+ops_cron_ansible_dir: /home/deploy/apps/infra/ansible
+ops_cron_log_file: /var/log/curs-ops.log
+ops_cron_backup_time: "15 3 * * *"
+ops_cron_rotate_time: "45 3 * * *"
+ops_cron_restore_time: "0 4 * * 0"
+ops_cron_restore_cleanup_time: "25 4 * * 0"
+ops_cron_image_prune_time: "10 5 * * 0"
+
 services:
   postgres:
     enabled: true

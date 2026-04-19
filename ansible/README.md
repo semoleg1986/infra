@@ -177,6 +177,20 @@ crontab -e
 45 2 * * * cd /home/deploy/apps/infra/ansible && KEEP_DAYS=14 KEEP_LAST=14 /usr/bin/make backup-rotate >> /home/deploy/backups/postgres/backup.log 2>&1
 ```
 
+### Nightly schedule через Ansible (рекомендуется)
+- Cron-файл хранится в git и накатывается через `playbooks/deploy.yml`:
+  - шаблон: `templates/curs-ops.cron.j2`
+  - целевой файл на сервере: `/etc/cron.d/curs-ops`
+- Управление:
+  - `group_vars/all.yml`: дефолты (`ops_cron_*`)
+  - `group_vars/prod.yml`: `ops_cron_enabled: true`
+- Что ставится автоматически:
+  - daily backup (`make backup-postgres`)
+  - daily rotate (`make backup-rotate`)
+  - weekly restore drill (`make restore-drill`)
+  - weekly cleanup `*_drill` баз
+  - weekly `docker image prune -a -f`
+
 ## Ops Baseline Check
 - Скрипт: `scripts/ops_baseline_check.sh`
 - Команда:

@@ -57,6 +57,8 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   make status
   make status-target SERVICE=users_service
   make smoke SERVICE_TOKEN=sometokencourse
+  make backup-postgres
+  make restore-drill BACKUP_DIR=~/backups/postgres/<timestamp>
   ```
 - По умолчанию используется `ENV=prod`. Для другого окружения:
   ```bash
@@ -117,3 +119,30 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 ## CI E2E
 - Workflow: `.github/workflows/e2e-contour-smoke.yml`
 - Поднимает `auth_service + users_service + course_service + payments_service` из GHCR и запускает `ansible/scripts/smoke_prod.sh`.
+
+## Postgres Backup / Restore Drill
+- Скрипт бэкапа: `scripts/pg_backup.sh`
+- Скрипт restore-drill: `scripts/pg_restore_drill.sh`
+
+1. Создать бэкап:
+   ```bash
+   make backup-postgres
+   ```
+   По умолчанию dump-файлы создаются в `~/backups/postgres/<timestamp>`.
+
+2. Выполнить restore-drill в отдельные БД с суффиксом `_drill`:
+   ```bash
+   make restore-drill BACKUP_DIR=~/backups/postgres/<timestamp>
+   ```
+
+3. Проверить список drill-баз:
+   ```bash
+   sudo docker exec curs_postgres psql -U postgres -d postgres -lqt | grep _drill
+   ```
+
+4. (Опционально) удалить drill-базы после проверки:
+   ```bash
+   for db in auth_service_prod_drill users_service_prod_drill course_service_prod_drill attribution_service_prod_drill live_class_service_prod_drill payments_service_prod_drill; do
+     sudo docker exec curs_postgres psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS \"$db\";"
+   done
+   ```

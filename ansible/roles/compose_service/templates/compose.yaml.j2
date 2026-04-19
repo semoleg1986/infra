@@ -2,7 +2,20 @@ services:
   {{ service_name }}:
     image: {{ service.image }}:{{ service.tag }}
     container_name: {{ service.container_name | default(service_name) }}
-    restart: unless-stopped
+    restart: {{ service.restart_policy | default(service_restart_policy | default('unless-stopped')) }}
+{% set resources = (service_default_resources | default({})) | combine((service_resources_overrides | default({})).get(service_name, {}), recursive=True) | combine(service.resources | default({}), recursive=True) %}
+{% if resources.cpus is defined %}
+    cpus: "{{ resources.cpus }}"
+{% endif %}
+{% if resources.mem_limit is defined %}
+    mem_limit: "{{ resources.mem_limit }}"
+{% endif %}
+{% if resources.mem_reservation is defined %}
+    mem_reservation: "{{ resources.mem_reservation }}"
+{% endif %}
+{% if resources.pids_limit is defined %}
+    pids_limit: {{ resources.pids_limit }}
+{% endif %}
 {% if service.env is defined and service.env | length > 0 %}
     env_file:
       - .env

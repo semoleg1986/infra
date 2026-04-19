@@ -7,6 +7,8 @@ ghcr_registry: ghcr.io
 ghcr_namespace: semoleg1986
 ghcr_require_login: false
 service_image_tag: latest
+service_restart_policy: unless-stopped
+service_default_resources: {}
 
 db_user: postgres
 db_password: postgres

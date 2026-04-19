@@ -73,6 +73,9 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Для связки `course_service -> users_service` задайте `users_service_token` (или `vault_users_service_token`).
 - Для `payments_service` задайте `payments_service_token` (или `vault_payments_service_token`).
 - Для связки `payments_service -> attribution_service` задайте `attribution_service_token` (или `vault_attribution_service_token`).
+- Для runtime hardening можно задать лимиты контейнеров:
+  - `service_default_resources` (общие лимиты для всех сервисов),
+  - `service_resources_overrides` (точечные overrides по имени сервиса).
 - Сервисы деплоятся per-service compose, но в единую внешнюю сеть `{{ docker_shared_network | default('curs_net') }}`.
 - Production управляется только через Ansible (`/opt/curs/*` compose-файлы).
 - Не запускайте параллельно `docker compose` из `~/apps/curs`, чтобы не получать конфликты `container_name`.

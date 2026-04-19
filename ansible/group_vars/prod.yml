@@ -8,6 +8,28 @@ payments_service_token: "{{ vault_payments_service_token | default(vault_course_
 attribution_service_token: "{{ vault_attribution_service_token | default(vault_course_service_token) }}"
 db_suffix: _prod
 
+# Runtime hardening (Sprint 5): default per-container limits for prod.
+service_default_resources:
+  cpus: "1.00"
+  mem_limit: "1g"
+  mem_reservation: "256m"
+  pids_limit: 256
+
+# Service-specific overrides for heavy/infra containers.
+service_resources_overrides:
+  postgres:
+    resources:
+      cpus: "1.50"
+      mem_limit: "2g"
+      mem_reservation: "512m"
+      pids_limit: 512
+  redis:
+    resources:
+      cpus: "0.50"
+      mem_limit: "512m"
+      mem_reservation: "128m"
+      pids_limit: 256
+
 # Явные production-теги образов (без latest) для предсказуемых откатов.
 service_image_tags:
   auth_service: main

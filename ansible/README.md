@@ -59,6 +59,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   make status-target SERVICE=users_service
   make smoke SERVICE_TOKEN=sometokencourse
   make backup-postgres
+  make backup-rotate
   make restore-drill BACKUP_DIR=~/backups/postgres/<timestamp>
   make ops-check
   ```
@@ -135,6 +136,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 ## Postgres Backup / Restore Drill
 - Скрипт бэкапа: `scripts/pg_backup.sh`
 - Скрипт restore-drill: `scripts/pg_restore_drill.sh`
+- Скрипт ротации: `scripts/backup_rotate.sh`
 
 1. Создать бэкап:
    ```bash
@@ -158,6 +160,22 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
      sudo docker exec curs_postgres psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS \"$db\";"
   done
   ```
+
+5. Ротация старых бэкапов:
+   ```bash
+   make backup-rotate
+   ```
+   По умолчанию: `KEEP_DAYS=14`, `KEEP_LAST=14`.
+
+### Nightly schedule (cron пример)
+```bash
+crontab -e
+```
+Добавьте:
+```cron
+15 2 * * * cd /home/deploy/apps/infra/ansible && /usr/bin/make backup-postgres >> /home/deploy/backups/postgres/backup.log 2>&1
+45 2 * * * cd /home/deploy/apps/infra/ansible && KEEP_DAYS=14 KEEP_LAST=14 /usr/bin/make backup-rotate >> /home/deploy/backups/postgres/backup.log 2>&1
+```
 
 ## Ops Baseline Check
 - Скрипт: `scripts/ops_baseline_check.sh`

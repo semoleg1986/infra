@@ -8,7 +8,7 @@ VARS := -e @group_vars/all.yml -e @group_vars/$(ENV).yml -e @group_vars/vault.ym
 ASK_FLAGS ?= --ask-vault-pass -K
 COMMON := ANSIBLE_ROLES_PATH=./roles ansible-playbook -i $(INVENTORY) -c local $(VARS) $(ASK_FLAGS)
 
-.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres restore-drill ops-check
+.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill ops-check
 
 help:
 	@echo "make deploy                          # full deploy for ENV=$(ENV)"
@@ -18,6 +18,7 @@ help:
 	@echo "make status-target SERVICE=users_service"
 	@echo "make smoke SERVICE_TOKEN=...         # run scripts/smoke_prod.sh"
 	@echo "make backup-postgres                 # create dumps in ~/backups/postgres/<timestamp>"
+	@echo "make backup-rotate                   # rotate backup dirs by age/count"
 	@echo "make restore-drill BACKUP_DIR=...    # restore dumps into *_drill DBs"
 	@echo "make ops-check                       # disk/health/5xx baseline check"
 	@echo "make ping                            # ansible ping"
@@ -54,6 +55,9 @@ smoke:
 
 backup-postgres:
 	./scripts/pg_backup.sh
+
+backup-rotate:
+	./scripts/backup_rotate.sh
 
 restore-drill:
 	@test -n "$(BACKUP_DIR)" || (echo "BACKUP_DIR is required, e.g. make restore-drill BACKUP_DIR=~/backups/postgres/20260419_120000" && exit 1)

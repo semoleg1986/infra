@@ -8,11 +8,12 @@ VARS := -e @group_vars/all.yml -e @group_vars/$(ENV).yml -e @group_vars/vault.ym
 ASK_FLAGS ?= --ask-vault-pass -K
 COMMON := ANSIBLE_ROLES_PATH=./roles ansible-playbook -i $(INVENTORY) -c local $(VARS) $(ASK_FLAGS)
 
-.PHONY: help ping deploy deploy-target status status-target smoke backup-postgres restore-drill ops-check
+.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres restore-drill ops-check
 
 help:
 	@echo "make deploy                          # full deploy for ENV=$(ENV)"
 	@echo "make deploy-target SERVICE=auth_service"
+	@echo "make rollback SERVICE=auth_service TAG=main"
 	@echo "make status                          # docker compose status for all services"
 	@echo "make status-target SERVICE=users_service"
 	@echo "make smoke SERVICE_TOKEN=...         # run scripts/smoke_prod.sh"
@@ -31,6 +32,13 @@ deploy-target:
 	@test -n "$(SERVICE)" || (echo "SERVICE is required, e.g. make deploy-target SERVICE=auth_service" && exit 1)
 	$(COMMON) $(PLAYBOOK_DEPLOY) \
 		-e '{"target_services":["$(SERVICE)"]}' \
+		--start-at-task "Validate selected services"
+
+rollback:
+	@test -n "$(SERVICE)" || (echo "SERVICE is required, e.g. make rollback SERVICE=auth_service TAG=main" && exit 1)
+	@test -n "$(TAG)" || (echo "TAG is required, e.g. make rollback SERVICE=auth_service TAG=main" && exit 1)
+	$(COMMON) $(PLAYBOOK_DEPLOY) \
+		-e '{"target_services":["$(SERVICE)"],"service_image_tags":{"$(SERVICE)":"$(TAG)"}}' \
 		--start-at-task "Validate selected services"
 
 status:

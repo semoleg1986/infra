@@ -54,6 +54,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   ```bash
   make deploy
   make deploy-target SERVICE=auth_service
+  make rollback SERVICE=auth_service TAG=main
   make status
   make status-target SERVICE=users_service
   make smoke SERVICE_TOKEN=sometokencourse
@@ -65,6 +66,13 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   ```bash
   make ENV=stage deploy
   ```
+
+## Rollback
+- Быстрый точечный rollback сервиса на нужный тег:
+  ```bash
+  make rollback SERVICE=course_service TAG=main
+  ```
+- Команда временно переопределяет `service_image_tags.<SERVICE>=<TAG>` через `-e` и деплоит только этот сервис.
 
 ## Важно
 - Замените `ghcr.io/your-org/*` на реальные образы.

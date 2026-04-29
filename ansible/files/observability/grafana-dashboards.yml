@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: curs-api-dashboards
+    orgId: 1
+    folder: Curs
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

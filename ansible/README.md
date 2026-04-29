@@ -211,15 +211,24 @@ crontab -e
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:
   - Prometheus alerts: `files/observability/prometheus-alerts.yml`
+  - Prometheus config: `files/observability/prometheus.yml`
   - Grafana dashboard: `files/observability/grafana-dashboard-curs-api.json`
+  - Grafana provisioning:
+    - `files/observability/grafana-datasource.yml`
+    - `files/observability/grafana-dashboards.yml`
 
-- Минимальные шаги интеграции:
-  1. Подключить rule-файл в конфиг Prometheus (`rule_files`).
-  2. Добавить scrape jobs для:
-     - `http://<host>:8002/metrics` (`users_service`)
-     - `http://<host>:8001/metrics` (`course_service`)
-     - `http://<host>:8004/metrics` (`payments_service`)
-  3. Импортировать dashboard JSON в Grafana.
+- Через Ansible:
+  1. В `group_vars/prod.yml` включены:
+     - `prometheus_enabled: true`
+     - `grafana_enabled: true`
+  2. Деплой:
+     ```bash
+     make deploy-target SERVICE=prometheus
+     make deploy-target SERVICE=grafana
+     ```
+  3. Проверка:
+     - Prometheus: `http://<host>:9090`
+     - Grafana: `http://<host>:3005` (admin/admin если не переопределено vault vars)
 
 - Правила алертов из коробки:
   - `CursApi5xxDetected`

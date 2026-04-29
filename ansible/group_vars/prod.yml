@@ -8,6 +8,8 @@ payments_service_token: "{{ vault_payments_service_token | default(vault_course_
 attribution_service_token: "{{ vault_attribution_service_token | default(vault_course_service_token) }}"
 db_suffix: _prod
 ops_cron_enabled: true
+prometheus_enabled: true
+grafana_enabled: true
 
 # Runtime hardening (Sprint 5): default per-container limits for prod.
 service_default_resources:
@@ -25,6 +27,18 @@ service_resources_overrides:
       mem_reservation: "512m"
       pids_limit: 512
   redis:
+    resources:
+      cpus: "0.50"
+      mem_limit: "512m"
+      mem_reservation: "128m"
+      pids_limit: 256
+  prometheus:
+    resources:
+      cpus: "0.75"
+      mem_limit: "768m"
+      mem_reservation: "192m"
+      pids_limit: 256
+  grafana:
     resources:
       cpus: "0.50"
       mem_limit: "512m"

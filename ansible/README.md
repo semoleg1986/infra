@@ -207,3 +207,21 @@ crontab -e
   ```bash
   DISK_WARN_PCT=85 DISK_CRIT_PCT=92 LOG_5XX_WARN_COUNT=3 make ops-check
   ```
+
+## Alerts & Dashboard (Sprint 5 - 2.3)
+- Готовые артефакты:
+  - Prometheus alerts: `files/observability/prometheus-alerts.yml`
+  - Grafana dashboard: `files/observability/grafana-dashboard-curs-api.json`
+
+- Минимальные шаги интеграции:
+  1. Подключить rule-файл в конфиг Prometheus (`rule_files`).
+  2. Добавить scrape jobs для:
+     - `http://<host>:8002/metrics` (`users_service`)
+     - `http://<host>:8001/metrics` (`course_service`)
+     - `http://<host>:8004/metrics` (`payments_service`)
+  3. Импортировать dashboard JSON в Grafana.
+
+- Правила алертов из коробки:
+  - `CursApi5xxDetected`
+  - `CursApiHigh5xxRatio`
+  - `CursApiHighAvgLatency`

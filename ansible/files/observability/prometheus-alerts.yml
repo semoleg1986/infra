@@ -1,0 +1,60 @@
+groups:
+  - name: curs-api-alerts
+    interval: 30s
+    rules:
+      - alert: CursApi5xxDetected
+        expr: |
+          sum by (service) (
+            rate(http_errors_total{service=~"users_service|course_service|payments_service",status=~"5.."}[5m])
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "5xx errors detected for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} has non-zero 5xx rate for more than 5 minutes."
+
+      - alert: CursApiHigh5xxRatio
+        expr: |
+          (
+            sum by (service) (
+              rate(http_errors_total{service=~"users_service|course_service|payments_service",status=~"5.."}[5m])
+            )
+            /
+            clamp_min(
+              sum by (service) (
+                rate(http_requests_total{service=~"users_service|course_service|payments_service"}[5m])
+              ),
+              1
+            )
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High 5xx ratio on {{ $labels.service }}"
+          description: "5xx/request ratio for {{ $labels.service }} is above 5% for 10 minutes."
+
+      - alert: CursApiHighAvgLatency
+        expr: |
+          (
+            sum by (service) (
+              rate(http_request_duration_seconds_sum{service=~"users_service|course_service|payments_service"}[5m])
+            )
+            /
+            clamp_min(
+              sum by (service) (
+                rate(http_request_duration_seconds_count{service=~"users_service|course_service|payments_service"}[5m])
+              ),
+              1
+            )
+          ) > 0.7
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High average latency on {{ $labels.service }}"
+          description: "Average latency for {{ $labels.service }} is above 700ms for 10 minutes."

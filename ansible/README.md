@@ -86,6 +86,10 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Для runtime hardening можно задать лимиты контейнеров:
   - `service_default_resources` (общие лимиты для всех сервисов),
   - `service_resources_overrides` (точечные overrides по имени сервиса).
+- Docker daemon log rotation также управляется через Ansible (`roles/docker`):
+  - `docker_log_driver` (по умолчанию `json-file`)
+  - `docker_log_max_size` (по умолчанию `10m`)
+  - `docker_log_max_file` (по умолчанию `5`)
 - Сервисы деплоятся per-service compose, но в единую внешнюю сеть `{{ docker_shared_network | default('curs_net') }}`.
 - Production управляется только через Ansible (`/opt/curs/*` compose-файлы).
 - Не запускайте параллельно `docker compose` из `~/apps/curs`, чтобы не получать конфликты `container_name`.

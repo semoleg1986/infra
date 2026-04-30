@@ -9,6 +9,9 @@ ghcr_require_login: false
 service_image_tag: latest
 service_restart_policy: unless-stopped
 service_default_resources: {}
+docker_log_driver: json-file
+docker_log_max_size: 10m
+docker_log_max_file: "5"
 
 db_user: postgres
 db_password: postgres

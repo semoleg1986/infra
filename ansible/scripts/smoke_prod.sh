@@ -2,13 +2,14 @@
 set -euo pipefail
 
 # Smoke check for production contour:
-# auth -> users -> course -> payments(optional)
+# auth -> users -> course -> payments(optional) -> student learning -> parent read
 
 AUTH_BASE_URL="${AUTH_BASE_URL:-http://127.0.0.1:8000}"
 USERS_BASE_URL="${USERS_BASE_URL:-http://127.0.0.1:8002}"
 COURSE_BASE_URL="${COURSE_BASE_URL:-http://127.0.0.1:8001}"
 PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
 SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
+SMOKE_LEARNING_ENABLED="${SMOKE_LEARNING_ENABLED:-1}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-1}"
 SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-}"
 
@@ -154,9 +155,73 @@ if [[ -z "${COURSE_ID}" ]]; then
   exit 1
 fi
 
+log "Create published learning structure in course_service"
+MODULE_PAYLOAD="${TMP_DIR}/module.json"
+cat > "${MODULE_PAYLOAD}" <<JSON
+{
+  "module_id": "module-smoke-${SMOKE_ID}",
+  "title": "Smoke Module ${SMOKE_ID}",
+  "description": "smoke",
+  "is_required": true
+}
+JSON
+MODULE_OUT="${TMP_DIR}/module.out.json"
+MODULE_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/admin/courses/${COURSE_ID}/modules" "${MODULE_PAYLOAD}" "${MODULE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+assert_2xx "${MODULE_STATUS}" "${MODULE_OUT}" "create module"
+
+MODULE_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("modules", [{}])[0].get("module_id","") if isinstance(d.get("modules"), list) and d.get("modules") else "module-smoke")' "${MODULE_OUT}")"
+if [[ -z "${MODULE_ID}" || "${MODULE_ID}" == "module-smoke" ]]; then
+  MODULE_ID="module-smoke-${SMOKE_ID}"
+fi
+
+for LESSON_NUM in 1 2; do
+  LESSON_ID="lesson-smoke-${SMOKE_ID}-${LESSON_NUM}"
+  LESSON_PAYLOAD="${TMP_DIR}/lesson-${LESSON_NUM}.json"
+  cat > "${LESSON_PAYLOAD}" <<JSON
+{
+  "lesson_id": "${LESSON_ID}",
+  "title": "Smoke Lesson ${LESSON_NUM}",
+  "description": "smoke",
+  "content_type": "video",
+  "content_ref": "cdn://smoke/${SMOKE_ID}/${LESSON_NUM}",
+  "duration_minutes": 15,
+  "is_preview": false
+}
+JSON
+  LESSON_OUT="${TMP_DIR}/lesson-${LESSON_NUM}.out.json"
+  LESSON_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/admin/courses/${COURSE_ID}/modules/${MODULE_ID}/lessons" "${LESSON_PAYLOAD}" "${LESSON_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  assert_2xx "${LESSON_STATUS}" "${LESSON_OUT}" "create lesson ${LESSON_NUM}"
+
+  LESSON_PATCH_PAYLOAD="${TMP_DIR}/lesson-${LESSON_NUM}.patch.json"
+  cat > "${LESSON_PATCH_PAYLOAD}" <<JSON
+{
+  "status": "published"
+}
+JSON
+  LESSON_PATCH_OUT="${TMP_DIR}/lesson-${LESSON_NUM}.patch.out.json"
+  LESSON_PATCH_STATUS="$(request_json "PATCH" "${COURSE_BASE_URL}/v1/admin/courses/${COURSE_ID}/modules/${MODULE_ID}/lessons/${LESSON_ID}" "${LESSON_PATCH_PAYLOAD}" "${LESSON_PATCH_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  assert_2xx "${LESSON_PATCH_STATUS}" "${LESSON_PATCH_OUT}" "publish lesson ${LESSON_NUM}"
+done
+
+MODULE_PATCH_PAYLOAD="${TMP_DIR}/module.patch.json"
+cat > "${MODULE_PATCH_PAYLOAD}" <<JSON
+{
+  "status": "published"
+}
+JSON
+MODULE_PATCH_OUT="${TMP_DIR}/module.patch.out.json"
+MODULE_PATCH_STATUS="$(request_json "PATCH" "${COURSE_BASE_URL}/v1/admin/courses/${COURSE_ID}/modules/${MODULE_ID}" "${MODULE_PATCH_PAYLOAD}" "${MODULE_PATCH_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+assert_2xx "${MODULE_PATCH_STATUS}" "${MODULE_PATCH_OUT}" "publish module"
+
+COURSE_PUBLISH_OUT="${TMP_DIR}/course.publish.out.json"
+COURSE_PUBLISH_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/admin/courses/${COURSE_ID}/publish" "" "${COURSE_PUBLISH_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+assert_2xx "${COURSE_PUBLISH_STATUS}" "${COURSE_PUBLISH_OUT}" "publish course"
+
 PAYMENT_STUDENT_ID="${SMOKE_PAYMENTS_STUDENT_ID:-student-smoke-${SMOKE_ID}}"
 PAYMENT_PARENT_ID="${SMOKE_PAYMENTS_PARENT_ID:-parent-smoke-${SMOKE_ID}}"
 PAYMENT_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-${COURSE_ID}}"
+STUDENT_EMAIL="student.smoke.${SMOKE_ID}@example.com"
+STUDENT_PASSWORD="${SMOKE_STUDENT_PASSWORD:-student12345}"
 
 if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
   if [[ "${SMOKE_PAYMENTS_PROVISION_RELATIONS}" == "1" ]]; then
@@ -174,12 +239,44 @@ JSON
     PARENT_STATUS="$(request_json "POST" "${USERS_BASE_URL}/v1/admin/users" "${PARENT_PAYLOAD}" "${PARENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
     assert_2xx "${PARENT_STATUS}" "${PARENT_OUT}" "create parent"
 
+    log "Register student in auth_service"
+    STUDENT_REGISTER_PAYLOAD="${TMP_DIR}/student.register.json"
+    cat > "${STUDENT_REGISTER_PAYLOAD}" <<JSON
+{
+  "email": "${STUDENT_EMAIL}",
+  "password": "${STUDENT_PASSWORD}",
+  "default_role": "student"
+}
+JSON
+    STUDENT_REGISTER_OUT="${TMP_DIR}/student.register.out.json"
+    STUDENT_REGISTER_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/register" "${STUDENT_REGISTER_PAYLOAD}" "${STUDENT_REGISTER_OUT}" -H "Content-Type: application/json")"
+    assert_2xx "${STUDENT_REGISTER_STATUS}" "${STUDENT_REGISTER_OUT}" "register student auth"
+
+    log "Student login in auth_service"
+    STUDENT_LOGIN_PAYLOAD="${TMP_DIR}/student.login.json"
+    cat > "${STUDENT_LOGIN_PAYLOAD}" <<JSON
+{
+  "email": "${STUDENT_EMAIL}",
+  "password": "${STUDENT_PASSWORD}",
+  "session_fingerprint": "student-smoke-${SMOKE_ID}"
+}
+JSON
+    STUDENT_LOGIN_OUT="${TMP_DIR}/student.login.out.json"
+    STUDENT_LOGIN_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/login" "${STUDENT_LOGIN_PAYLOAD}" "${STUDENT_LOGIN_OUT}" -H "Content-Type: application/json")"
+    assert_2xx "${STUDENT_LOGIN_STATUS}" "${STUDENT_LOGIN_OUT}" "student login"
+
+    STUDENT_ACCESS_TOKEN="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["access_token"])' "${STUDENT_LOGIN_OUT}")"
+    STUDENT_ME_OUT="${TMP_DIR}/student.me.out.json"
+    STUDENT_ME_STATUS="$(request_json "GET" "${AUTH_BASE_URL}/v1/auth/me" "" "${STUDENT_ME_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
+    assert_2xx "${STUDENT_ME_STATUS}" "${STUDENT_ME_OUT}" "student auth me"
+    PAYMENT_STUDENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["user_id"])' "${STUDENT_ME_OUT}")"
+
     log "Create student in users_service"
     STUDENT_PAYLOAD="${TMP_DIR}/student.json"
     cat > "${STUDENT_PAYLOAD}" <<JSON
 {
   "user_id": "${PAYMENT_STUDENT_ID}",
-  "email": "student.smoke.${SMOKE_ID}@example.com",
+  "email": "${STUDENT_EMAIL}",
   "display_name": "Smoke Student ${SMOKE_ID}",
   "roles": ["student"]
 }
@@ -262,6 +359,71 @@ JSON
 
   log "payments_intent_id=${PAYMENT_INTENT_ID}"
   log "payments_access_grant_id=${ACCESS_GRANT_ID}"
+
+  if [[ "${SMOKE_LEARNING_ENABLED}" == "1" ]]; then
+    LESSON1_ID="lesson-smoke-${SMOKE_ID}-1"
+    LESSON2_ID="lesson-smoke-${SMOKE_ID}-2"
+
+    log "Student complete first lesson"
+    STUDENT_COMPLETE1_OUT="${TMP_DIR}/student.complete1.out.json"
+    STUDENT_COMPLETE1_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/student/courses/${PAYMENT_COURSE_ID}/lessons/${LESSON1_ID}/complete" "" "${STUDENT_COMPLETE1_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
+    assert_2xx "${STUDENT_COMPLETE1_STATUS}" "${STUDENT_COMPLETE1_OUT}" "student complete lesson 1"
+    COURSE_STATUS_1="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["course_status"])' "${STUDENT_COMPLETE1_OUT}")"
+    if [[ "${COURSE_STATUS_1}" != "in_progress" ]]; then
+      log "ERROR student complete lesson 1: expected in_progress, got ${COURSE_STATUS_1}"
+      cat "${STUDENT_COMPLETE1_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Student complete second lesson"
+    STUDENT_COMPLETE2_OUT="${TMP_DIR}/student.complete2.out.json"
+    STUDENT_COMPLETE2_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/student/courses/${PAYMENT_COURSE_ID}/lessons/${LESSON2_ID}/complete" "" "${STUDENT_COMPLETE2_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
+    assert_2xx "${STUDENT_COMPLETE2_STATUS}" "${STUDENT_COMPLETE2_OUT}" "student complete lesson 2"
+    COURSE_STATUS_2="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["course_status"])' "${STUDENT_COMPLETE2_OUT}")"
+    if [[ "${COURSE_STATUS_2}" != "completed" ]]; then
+      log "ERROR student complete lesson 2: expected completed, got ${COURSE_STATUS_2}"
+      cat "${STUDENT_COMPLETE2_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Student read own progress"
+    STUDENT_PROGRESS_OUT="${TMP_DIR}/student.progress.out.json"
+    STUDENT_PROGRESS_STATUS="$(request_json "GET" "${COURSE_BASE_URL}/v1/student/courses/${PAYMENT_COURSE_ID}/progress" "" "${STUDENT_PROGRESS_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
+    assert_2xx "${STUDENT_PROGRESS_STATUS}" "${STUDENT_PROGRESS_OUT}" "student progress"
+    STUDENT_PROGRESS_PERCENT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["progress_percent"])' "${STUDENT_PROGRESS_OUT}")"
+    if [[ "${STUDENT_PROGRESS_PERCENT}" != "100.0" ]]; then
+      log "ERROR student progress: expected 100.0, got ${STUDENT_PROGRESS_PERCENT}"
+      cat "${STUDENT_PROGRESS_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Admin/parent view progress"
+    PARENT_PROGRESS_OUT="${TMP_DIR}/parent.progress.out.json"
+    PARENT_PROGRESS_STATUS="$(request_json "GET" "${COURSE_BASE_URL}/v1/parent/students/${PAYMENT_STUDENT_ID}/courses/progress?status=completed&limit=10&offset=0" "" "${PARENT_PROGRESS_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${PARENT_PROGRESS_STATUS}" "${PARENT_PROGRESS_OUT}" "parent progress read"
+    PARENT_PROGRESS_MATCH="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(any(item.get("course_id")==sys.argv[2] and item.get("status")=="completed" for item in d.get("items", []))).lower())' "${PARENT_PROGRESS_OUT}" "${PAYMENT_COURSE_ID}")"
+    if [[ "${PARENT_PROGRESS_MATCH}" != "true" ]]; then
+      log "ERROR parent progress read: completed course not found"
+      cat "${PARENT_PROGRESS_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Admin/parent view completed courses"
+    PARENT_COMPLETED_OUT="${TMP_DIR}/parent.completed.out.json"
+    PARENT_COMPLETED_STATUS="$(request_json "GET" "${COURSE_BASE_URL}/v1/parent/students/${PAYMENT_STUDENT_ID}/courses/completed?limit=10&offset=0" "" "${PARENT_COMPLETED_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${PARENT_COMPLETED_STATUS}" "${PARENT_COMPLETED_OUT}" "parent completed read"
+    PARENT_COMPLETED_MATCH="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(any(item.get("course_id")==sys.argv[2] and item.get("completed_at") for item in d.get("items", []))).lower())' "${PARENT_COMPLETED_OUT}" "${PAYMENT_COURSE_ID}")"
+    if [[ "${PARENT_COMPLETED_MATCH}" != "true" ]]; then
+      log "ERROR parent completed read: course not found"
+      cat "${PARENT_COMPLETED_OUT}"
+      echo
+      exit 1
+    fi
+  fi
 fi
 
 log "OK"

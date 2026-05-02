@@ -2,10 +2,20 @@ groups:
   - name: curs-api-alerts
     interval: 30s
     rules:
+      - alert: CursApiServiceDown
+        expr: up{job=~"auth_service|users_service|course_service|payments_service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} for more than 2 minutes."
+
       - alert: CursApi5xxDetected
         expr: |
           sum by (service) (
-            rate(http_errors_total{service=~"users_service|course_service|payments_service",status=~"5.."}[5m])
+            rate(http_errors_total{service=~"auth_service|users_service|course_service|payments_service",status=~"5.."}[5m])
           ) > 0
         for: 5m
         labels:
@@ -19,12 +29,12 @@ groups:
         expr: |
           (
             sum by (service) (
-              rate(http_errors_total{service=~"users_service|course_service|payments_service",status=~"5.."}[5m])
+              rate(http_errors_total{service=~"auth_service|users_service|course_service|payments_service",status=~"5.."}[5m])
             )
             /
             clamp_min(
               sum by (service) (
-                rate(http_requests_total{service=~"users_service|course_service|payments_service"}[5m])
+                rate(http_requests_total{service=~"auth_service|users_service|course_service|payments_service"}[5m])
               ),
               1
             )
@@ -41,12 +51,12 @@ groups:
         expr: |
           (
             sum by (service) (
-              rate(http_request_duration_seconds_sum{service=~"users_service|course_service|payments_service"}[5m])
+              rate(http_request_duration_seconds_sum{service=~"auth_service|users_service|course_service|payments_service"}[5m])
             )
             /
             clamp_min(
               sum by (service) (
-                rate(http_request_duration_seconds_count{service=~"users_service|course_service|payments_service"}[5m])
+                rate(http_request_duration_seconds_count{service=~"auth_service|users_service|course_service|payments_service"}[5m])
               ),
               1
             )
@@ -58,3 +68,47 @@ groups:
         annotations:
           summary: "High average latency on {{ $labels.service }}"
           description: "Average latency for {{ $labels.service }} is above 700ms for 10 minutes."
+
+      - alert: CursAuthRateLimitSpike
+        expr: |
+          sum(rate(auth_rate_limit_hits_total{scope="auth_login"}[10m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Auth login rate-limit spike detected"
+          description: "auth_service login rate-limit hits are above expected baseline for 10 minutes."
+
+      - alert: CursCourseReplaySpike
+        expr: |
+          sum(rate(course_access_granted_replays_total[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "course_service replay dedup events detected"
+          description: "course_service is receiving repeated course.access.granted events for more than 10 minutes."
+
+      - alert: CursPaymentsDeniedAccessSpike
+        expr: |
+          sum(rate(payment_access_checks_total{result="denied"}[10m])) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "payments_service denied access checks are rising"
+          description: "payments_service internal access denied rate is above threshold for 10 minutes."
+
+      - alert: CursUsersInternalLookupMissSpike
+        expr: |
+          sum(rate(internal_parent_student_lookup_failures_total{result="not_found"}[10m])) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "users_service parent-student lookup misses are rising"
+          description: "users_service internal parent-student misses are above threshold for 10 minutes."

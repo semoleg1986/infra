@@ -25,20 +25,61 @@
       },
       "fieldConfig": {
         "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(up{job=~\"auth_service|users_service|course_service|payments_service\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Services Up",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
           "unit": "reqps"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
+        "h": 6,
+        "w": 18,
+        "x": 6,
         "y": 0
       },
-      "id": 1,
+      "id": 2,
       "targets": [
         {
-          "expr": "sum by(service) (rate(http_requests_total{service=~\"users_service|course_service|payments_service\"}[5m]))",
+          "expr": "sum by(service) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service\"}[5m]))",
           "legendFormat": "{{service}}",
           "refId": "A"
         }
@@ -60,13 +101,13 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 6
       },
-      "id": 2,
+      "id": 3,
       "targets": [
         {
-          "expr": "sum by(service) (rate(http_request_duration_seconds_sum{service=~\"users_service|course_service|payments_service\"}[5m])) / clamp_min(sum by(service) (rate(http_request_duration_seconds_count{service=~\"users_service|course_service|payments_service\"}[5m])), 1)",
+          "expr": "sum by(service) (rate(http_request_duration_seconds_sum{service=~\"auth_service|users_service|course_service|payments_service\"}[5m])) / clamp_min(sum by(service) (rate(http_request_duration_seconds_count{service=~\"auth_service|users_service|course_service|payments_service\"}[5m])), 1)",
           "legendFormat": "{{service}}",
           "refId": "A"
         }
@@ -88,13 +129,13 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 8
+        "x": 12,
+        "y": 6
       },
-      "id": 3,
+      "id": 4,
       "targets": [
         {
-          "expr": "sum by(service) (rate(http_errors_total{service=~\"users_service|course_service|payments_service\",status=~\"5..\"}[5m])) / clamp_min(sum by(service) (rate(http_requests_total{service=~\"users_service|course_service|payments_service\"}[5m])), 1)",
+          "expr": "sum by(service) (rate(http_errors_total{service=~\"auth_service|users_service|course_service|payments_service\",status=~\"5..\"}[5m])) / clamp_min(sum by(service) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service\"}[5m])), 1)",
           "legendFormat": "{{service}}",
           "refId": "A"
         }
@@ -116,18 +157,170 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 8
+        "x": 0,
+        "y": 14
       },
-      "id": 4,
+      "id": 5,
       "targets": [
         {
-          "expr": "sum by(service,status) (rate(http_requests_total{service=~\"users_service|course_service|payments_service\"}[5m]))",
+          "expr": "sum by(service,status) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service\"}[5m]))",
           "legendFormat": "{{service}} / {{status}}",
           "refId": "A"
         }
       ],
       "title": "Responses by Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(auth_login_success_total)",
+          "legendFormat": "login success",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(auth_login_fail_total)",
+          "legendFormat": "login fail",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(auth_rate_limit_hits_total)",
+          "legendFormat": "rate-limit hits",
+          "refId": "C"
+        }
+      ],
+      "title": "Auth Flow Totals",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "sum(course_access_granted_applied_total)",
+          "legendFormat": "applied",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(course_access_granted_replays_total)",
+          "legendFormat": "replays",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(public_course_requests_total{result=\"success\"})",
+          "legendFormat": "public success",
+          "refId": "C"
+        }
+      ],
+      "title": "Course Flow Totals",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "sum(payment_intents_created_total)",
+          "legendFormat": "created",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(payment_intents_approved_total)",
+          "legendFormat": "approved",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(payment_access_checks_total)",
+          "legendFormat": "access checks",
+          "refId": "C"
+        }
+      ],
+      "title": "Payments Flow Totals",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "sum(parent_student_links_created_total)",
+          "legendFormat": "links created",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(parent_students_list_requests_total)",
+          "legendFormat": "parent list requests",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(internal_parent_student_lookup_failures_total)",
+          "legendFormat": "internal lookup misses",
+          "refId": "C"
+        }
+      ],
+      "title": "Users Parent-Student Flow Totals",
       "type": "timeseries"
     }
   ],
@@ -140,7 +333,7 @@
     "from": "now-6h",
     "to": "now"
   },
-  "title": "Curs API Health (users/course/payments)",
+  "title": "Curs Platform Overview",
   "uid": "curs-api-health",
-  "version": 1
+  "version": 2
 }

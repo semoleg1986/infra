@@ -222,15 +222,49 @@ PAYMENT_PARENT_ID="${SMOKE_PAYMENTS_PARENT_ID:-parent-smoke-${SMOKE_ID}}"
 PAYMENT_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-${COURSE_ID}}"
 STUDENT_EMAIL="student.smoke.${SMOKE_ID}@example.com"
 STUDENT_PASSWORD="${SMOKE_STUDENT_PASSWORD:-student12345}"
+PARENT_EMAIL="parent.smoke.${SMOKE_ID}@example.com"
+PARENT_PASSWORD="${SMOKE_PARENT_PASSWORD:-parent12345}"
 
 if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
   if [[ "${SMOKE_PAYMENTS_PROVISION_RELATIONS}" == "1" ]]; then
+    log "Register parent in auth_service"
+    PARENT_REGISTER_PAYLOAD="${TMP_DIR}/parent.register.json"
+    cat > "${PARENT_REGISTER_PAYLOAD}" <<JSON
+{
+  "email": "${PARENT_EMAIL}",
+  "password": "${PARENT_PASSWORD}",
+  "default_role": "parent"
+}
+JSON
+    PARENT_REGISTER_OUT="${TMP_DIR}/parent.register.out.json"
+    PARENT_REGISTER_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/register" "${PARENT_REGISTER_PAYLOAD}" "${PARENT_REGISTER_OUT}" -H "Content-Type: application/json")"
+    assert_2xx "${PARENT_REGISTER_STATUS}" "${PARENT_REGISTER_OUT}" "register parent auth"
+
+    log "Parent login in auth_service"
+    PARENT_LOGIN_PAYLOAD="${TMP_DIR}/parent.login.json"
+    cat > "${PARENT_LOGIN_PAYLOAD}" <<JSON
+{
+  "email": "${PARENT_EMAIL}",
+  "password": "${PARENT_PASSWORD}",
+  "session_fingerprint": "parent-smoke-${SMOKE_ID}"
+}
+JSON
+    PARENT_LOGIN_OUT="${TMP_DIR}/parent.login.out.json"
+    PARENT_LOGIN_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/login" "${PARENT_LOGIN_PAYLOAD}" "${PARENT_LOGIN_OUT}" -H "Content-Type: application/json")"
+    assert_2xx "${PARENT_LOGIN_STATUS}" "${PARENT_LOGIN_OUT}" "parent login"
+
+    PARENT_ACCESS_TOKEN="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["access_token"])' "${PARENT_LOGIN_OUT}")"
+    PARENT_ME_OUT="${TMP_DIR}/parent.me.out.json"
+    PARENT_ME_STATUS="$(request_json "GET" "${AUTH_BASE_URL}/v1/auth/me" "" "${PARENT_ME_OUT}" -H "Authorization: Bearer ${PARENT_ACCESS_TOKEN}")"
+    assert_2xx "${PARENT_ME_STATUS}" "${PARENT_ME_OUT}" "parent auth me"
+    PAYMENT_PARENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["account_id"])' "${PARENT_ME_OUT}")"
+
     log "Create parent in users_service"
     PARENT_PAYLOAD="${TMP_DIR}/parent.json"
     cat > "${PARENT_PAYLOAD}" <<JSON
 {
   "user_id": "${PAYMENT_PARENT_ID}",
-  "email": "parent.smoke.${SMOKE_ID}@example.com",
+  "email": "${PARENT_EMAIL}",
   "display_name": "Smoke Parent ${SMOKE_ID}",
   "roles": ["parent"]
 }
@@ -311,7 +345,7 @@ JSON
 JSON
 
   PAYMENT_OUT="${TMP_DIR}/payment.out.json"
-  PAYMENT_STATUS="$(request_json "POST" "${PAYMENTS_BASE_URL}/v1/parent/payments/intents" "${PAYMENT_PAYLOAD}" "${PAYMENT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+  PAYMENT_STATUS="$(request_json "POST" "${PAYMENTS_BASE_URL}/v1/parent/payments/intents" "${PAYMENT_PAYLOAD}" "${PAYMENT_OUT}" -H "Authorization: Bearer ${PARENT_ACCESS_TOKEN}" -H "Content-Type: application/json")"
   assert_2xx "${PAYMENT_STATUS}" "${PAYMENT_OUT}" "create payment intent"
 
   PAYMENT_INTENT_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("payment_intent_id",""))' "${PAYMENT_OUT}")"

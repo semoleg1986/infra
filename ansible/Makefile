@@ -8,7 +8,7 @@ VARS := -e @group_vars/all.yml -e @group_vars/$(ENV).yml -e @group_vars/vault.ym
 ASK_FLAGS ?= --ask-vault-pass -K
 COMMON := ANSIBLE_ROLES_PATH=./roles ansible-playbook -i $(INVENTORY) -c local $(VARS) $(ASK_FLAGS)
 
-.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill ops-check
+.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill ops-check load-auth-burst
 
 help:
 	@echo "make deploy                          # full deploy for ENV=$(ENV)"
@@ -21,6 +21,7 @@ help:
 	@echo "make backup-rotate                   # rotate backup dirs by age/count"
 	@echo "make restore-drill BACKUP_DIR=...    # restore dumps into *_drill DBs"
 	@echo "make ops-check                       # disk/health/5xx baseline check"
+	@echo "make load-auth-burst                 # run server-side auth load baseline via Dockerized k6"
 	@echo "make ping                            # ansible ping"
 
 ping:
@@ -65,3 +66,6 @@ restore-drill:
 
 ops-check:
 	./scripts/ops_baseline_check.sh
+
+load-auth-burst:
+	./scripts/load_auth_burst.sh

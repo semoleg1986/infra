@@ -62,6 +62,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   make backup-rotate
   make restore-drill BACKUP_DIR=~/backups/postgres/<timestamp>
   make ops-check
+  make load-auth-burst
   ```
 - По умолчанию используется `ENV=prod`. Для другого окружения:
   ```bash
@@ -210,6 +211,36 @@ crontab -e
 - Полезные overrides:
   ```bash
   DISK_WARN_PCT=85 DISK_CRIT_PCT=92 LOG_5XX_WARN_COUNT=3 make ops-check
+  ```
+
+## Load Baseline (Sprint 6 - 3.2)
+- Первый server-side сценарий:
+  - `scripts/load/auth-burst.k6.js`
+- Обертка запуска:
+  - `scripts/load_auth_burst.sh`
+- Команда:
+  ```bash
+  make load-auth-burst
+  ```
+- По умолчанию сценарий:
+  - бьет в `AUTH_BASE_URL=http://127.0.0.1:8000`
+  - запускается как `K6_VUS=20`
+  - работает `K6_DURATION=2m`
+  - использует Docker image `grafana/k6:0.49.0`
+- Важно:
+  - отдельная установка `k6` на сервер не нужна
+  - запуск идет через `docker run --network host`
+  - для первого безопасного прогона лучше оставить дефолтный профиль и только потом повышать `K6_VUS`
+- Полезные overrides:
+  ```bash
+  AUTH_BASE_URL=http://127.0.0.1:8000 K6_VUS=50 K6_DURATION=3m make load-auth-burst
+  ```
+- Использование существующего аккаунта вместо auto-register:
+  ```bash
+  AUTH_REGISTER_ENABLED=false \
+  AUTH_EMAIL=load.user@example.com \
+  AUTH_PASSWORD=LoadTest12345! \
+  make load-auth-burst
   ```
 
 ## Alerts & Dashboard (Sprint 5 - 2.3)

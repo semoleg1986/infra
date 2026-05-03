@@ -14,6 +14,9 @@ const loginDuration = new Trend('auth_login_duration_ms');
 const meDuration = new Trend('auth_me_duration_ms');
 const loginFailures = new Counter('auth_login_failures_total');
 const meFailures = new Counter('auth_me_failures_total');
+const login429s = new Counter('auth_login_status_429_total');
+const login5xxs = new Counter('auth_login_status_5xx_total');
+const loginOtherErrors = new Counter('auth_login_status_other_total');
 const successRate = new Rate('auth_flow_success_rate');
 
 export const options = {
@@ -105,34 +108,57 @@ export default function (data) {
   );
 
   loginDuration.add(loginResponse.timings.duration);
-  const loginOk = check(loginResponse, {
+  const loginStatusOk = check(loginResponse, {
     'login status is 200': (r) => r.status === 200,
-    'login returns access token': (r) => Boolean(r.json('access_token')),
+  });
+
+  if (!loginStatusOk) {
+    loginFailures.add(1);
+    if (loginResponse.status === 429) {
+      login429s.add(1);
+    } else if (loginResponse.status >= 500) {
+      login5xxs.add(1);
+    } else {
+      loginOtherErrors.add(1);
+    }
+    successRate.add(false);
+    sleep(thinkTimeSeconds);
+    return;
+  }
+
+  let accessToken = '';
+  try {
+    accessToken = loginResponse.json('access_token') || '';
+  } catch (_) {
+    accessToken = '';
+  }
+
+  const loginOk = check(loginResponse, {
+    'login returns access token': () => Boolean(accessToken),
   });
 
   if (!loginOk) {
-    if (loginResponse.status === 429) {
-      loginFailures.add(1);
-      successRate.add(false);
-      sleep(thinkTimeSeconds);
-      return;
-    }
     loginFailures.add(1);
     successRate.add(false);
     sleep(thinkTimeSeconds);
     return;
   }
 
-  const accessToken = loginResponse.json('access_token');
   const meResponse = http.get(`${authBaseUrl}/v1/auth/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     tags: { endpoint: 'auth_me' },
   });
 
   meDuration.add(meResponse.timings.duration);
+  let meEmail = '';
+  try {
+    meEmail = meResponse.json('email') || '';
+  } catch (_) {
+    meEmail = '';
+  }
   const meOk = check(meResponse, {
     'me status is 200': (r) => r.status === 200,
-    'me returns same email': (r) => r.json('email') === user.email,
+    'me returns same email': () => meEmail === user.email,
   });
 
   if (!meOk) {

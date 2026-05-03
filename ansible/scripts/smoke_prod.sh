@@ -323,6 +323,7 @@ JSON
     STUDENT_ME_OUT="${TMP_DIR}/student.me.out.json"
     STUDENT_ME_STATUS="$(request_json "GET" "${AUTH_BASE_URL}/v1/auth/me" "" "${STUDENT_ME_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
     assert_2xx "${STUDENT_ME_STATUS}" "${STUDENT_ME_OUT}" "student auth me"
+    STUDENT_ACCOUNT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["account_id"])' "${STUDENT_ME_OUT}")"
     PAYMENT_STUDENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["user_id"])' "${STUDENT_ME_OUT}")"
 
     log "Create student in users_service"
@@ -518,7 +519,7 @@ JSON
       LIVE_ATTENDANCE_OUT="${TMP_DIR}/live.attendance.out.json"
       LIVE_ATTENDANCE_STATUS="$(request_json "GET" "${LIVE_BASE_URL}/v1/live/rooms/${LIVE_ROOM_ID}/attendance" "" "${LIVE_ATTENDANCE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
       assert_2xx "${LIVE_ATTENDANCE_STATUS}" "${LIVE_ATTENDANCE_OUT}" "live attendance read"
-      LIVE_ATTENDANCE_MATCH="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); student_id=sys.argv[2]; print(str(any(item.get("accountId")==student_id and item.get("sessionCount")==1 and item.get("lastLeftAt") for item in d)).lower())' "${LIVE_ATTENDANCE_OUT}" "${PAYMENT_STUDENT_ID}")"
+      LIVE_ATTENDANCE_MATCH="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); student_account_id=sys.argv[2]; print(str(any(item.get("accountId")==student_account_id and item.get("sessionCount")==1 and item.get("lastLeftAt") for item in d)).lower())' "${LIVE_ATTENDANCE_OUT}" "${STUDENT_ACCOUNT_ID}")"
       if [[ "${LIVE_ATTENDANCE_MATCH}" != "true" ]]; then
         log "ERROR live attendance read: student attendance record not found"
         cat "${LIVE_ATTENDANCE_OUT}"

@@ -8,10 +8,12 @@ AUTH_BASE_URL="${AUTH_BASE_URL:-http://127.0.0.1:8000}"
 USERS_BASE_URL="${USERS_BASE_URL:-http://127.0.0.1:8002}"
 COURSE_BASE_URL="${COURSE_BASE_URL:-http://127.0.0.1:8001}"
 LIVE_BASE_URL="${LIVE_BASE_URL:-http://127.0.0.1:8010}"
+ATTR_BASE_URL="${ATTR_BASE_URL:-http://127.0.0.1:8003}"
 PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
 SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
 SMOKE_LEARNING_ENABLED="${SMOKE_LEARNING_ENABLED:-1}"
 SMOKE_LIVE_ENABLED="${SMOKE_LIVE_ENABLED:-0}"
+SMOKE_ATTRIBUTION_ENABLED="${SMOKE_ATTRIBUTION_ENABLED:-0}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-1}"
 SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-}"
 
@@ -20,9 +22,14 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
 SESSION_FINGERPRINT="${SESSION_FINGERPRINT:-prod-smoke-$(date +%s)}"
 
 SERVICE_TOKEN="${SERVICE_TOKEN:-sometokencourse}"
+ATTR_SERVICE_TOKEN="${ATTR_SERVICE_TOKEN:-${SERVICE_TOKEN}}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
+
+log() {
+  printf '[smoke] %s\n' "$*"
+}
 
 if [[ "${SMOKE_LIVE_ENABLED}" == "1" && "${SMOKE_PAYMENTS_ENABLED}" != "1" ]]; then
   log "ERROR live smoke requires SMOKE_PAYMENTS_ENABLED=1"
@@ -34,9 +41,10 @@ if [[ "${SMOKE_LIVE_ENABLED}" == "1" && "${SMOKE_LEARNING_ENABLED}" != "1" ]]; t
   exit 1
 fi
 
-log() {
-  printf '[smoke] %s\n' "$*"
-}
+if [[ "${SMOKE_ATTRIBUTION_ENABLED}" == "1" && "${SMOKE_PAYMENTS_ENABLED}" != "1" ]]; then
+  log "ERROR attribution smoke requires SMOKE_PAYMENTS_ENABLED=1"
+  exit 1
+fi
 
 request_json() {
   # usage: request_json METHOD URL BODY_FILE OUT_BODY_FILE [HEADER...]
@@ -96,6 +104,14 @@ if [[ "${SMOKE_LIVE_ENABLED}" == "1" ]]; then
   code="$(curl -sS -o /dev/null -w '%{http_code}' "${LIVE_BASE_URL}/healthz")"
   if [[ "${code}" != "200" ]]; then
     log "ERROR health check failed for ${LIVE_BASE_URL}/healthz: HTTP ${code}"
+    exit 1
+  fi
+fi
+
+if [[ "${SMOKE_ATTRIBUTION_ENABLED}" == "1" ]]; then
+  code="$(curl -sS -o /dev/null -w '%{http_code}' "${ATTR_BASE_URL}/healthz")"
+  if [[ "${code}" != "200" ]]; then
+    log "ERROR health check failed for ${ATTR_BASE_URL}/healthz: HTTP ${code}"
     exit 1
   fi
 fi
@@ -414,6 +430,135 @@ JSON
 
   log "payments_intent_id=${PAYMENT_INTENT_ID}"
   log "payments_access_grant_id=${ACCESS_GRANT_ID}"
+
+  if [[ "${SMOKE_ATTRIBUTION_ENABLED}" == "1" ]]; then
+    TODAY_UTC="$(date -u +%F)"
+    ATTR_CHANNEL="ads"
+    ATTR_CAMPAIGN="smoke-campaign-${SMOKE_ID}"
+    ATTR_SOURCE="blogger"
+    ATTR_MEDIUM="influencer"
+
+    log "Create referral token in attribution_service"
+    ATTR_TOKEN_PAYLOAD="${TMP_DIR}/attr.token.json"
+    cat > "${ATTR_TOKEN_PAYLOAD}" <<JSON
+{
+  "channel": "${ATTR_CHANNEL}",
+  "reuse_policy": "shared_campaign",
+  "campaign": "${ATTR_CAMPAIGN}",
+  "source": "${ATTR_SOURCE}",
+  "medium": "${ATTR_MEDIUM}",
+  "course_id": "${PAYMENT_COURSE_ID}",
+  "discount_type": "percent",
+  "discount_value": 10,
+  "discount_cap": 15
+}
+JSON
+    ATTR_TOKEN_OUT="${TMP_DIR}/attr.token.out.json"
+    ATTR_TOKEN_STATUS="$(request_json "POST" "${ATTR_BASE_URL}/v1/admin/referral-tokens" "${ATTR_TOKEN_PAYLOAD}" "${ATTR_TOKEN_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${ATTR_TOKEN_STATUS}" "${ATTR_TOKEN_OUT}" "create attribution token"
+    REFERRAL_TOKEN="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["token"])' "${ATTR_TOKEN_OUT}")"
+    if [[ -z "${REFERRAL_TOKEN}" ]]; then
+      log "ERROR create attribution token: token is empty"
+      cat "${ATTR_TOKEN_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Track referral click in attribution_service"
+    ATTR_CLICK_PAYLOAD="${TMP_DIR}/attr.click.json"
+    cat > "${ATTR_CLICK_PAYLOAD}" <<JSON
+{
+  "anonymous_id": "anon-smoke-${SMOKE_ID}",
+  "source_url": "https://example.com/smoke/${SMOKE_ID}",
+  "utm_source": "${ATTR_SOURCE}",
+  "utm_medium": "${ATTR_MEDIUM}",
+  "utm_campaign": "${ATTR_CAMPAIGN}"
+}
+JSON
+    ATTR_CLICK_OUT="${TMP_DIR}/attr.click.out.json"
+    ATTR_CLICK_STATUS="$(request_json "POST" "${ATTR_BASE_URL}/v1/public/referrals/${REFERRAL_TOKEN}/click" "${ATTR_CLICK_PAYLOAD}" "${ATTR_CLICK_OUT}" -H "Content-Type: application/json")"
+    assert_2xx "${ATTR_CLICK_STATUS}" "${ATTR_CLICK_OUT}" "track attribution click"
+
+    log "Resolve discount in attribution_service"
+    ATTR_RESOLVE_PAYLOAD="${TMP_DIR}/attr.resolve.json"
+    cat > "${ATTR_RESOLVE_PAYLOAD}" <<JSON
+{
+  "course_id": "${PAYMENT_COURSE_ID}",
+  "referral_token": "${REFERRAL_TOKEN}",
+  "parent_id": "${PAYMENT_PARENT_ID}"
+}
+JSON
+    ATTR_RESOLVE_OUT="${TMP_DIR}/attr.resolve.out.json"
+    ATTR_RESOLVE_STATUS="$(request_json "POST" "${ATTR_BASE_URL}/v1/internal/discount/resolve" "${ATTR_RESOLVE_PAYLOAD}" "${ATTR_RESOLVE_OUT}" -H "X-Service-Token: ${ATTR_SERVICE_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${ATTR_RESOLVE_STATUS}" "${ATTR_RESOLVE_OUT}" "resolve attribution discount"
+    ATTR_DISCOUNT_VALID="$(python3 -c 'import json,sys; print(str(json.load(open(sys.argv[1]))["valid"]).lower())' "${ATTR_RESOLVE_OUT}")"
+    if [[ "${ATTR_DISCOUNT_VALID}" != "true" ]]; then
+      log "ERROR resolve attribution discount: expected valid=true"
+      cat "${ATTR_RESOLVE_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Record requested conversion in attribution_service"
+    ATTR_REQUESTED_PAYLOAD="${TMP_DIR}/attr.requested.json"
+    python3 - "${ATTR_RESOLVE_OUT}" "${ATTR_REQUESTED_PAYLOAD}" "${ACCESS_GRANT_ID}" "${PAYMENT_COURSE_ID}" "${PAYMENT_STUDENT_ID}" "${PAYMENT_PARENT_ID}" "${REFERRAL_TOKEN}" <<'PY'
+import json
+import sys
+resolve = json.load(open(sys.argv[1]))
+payload = {
+    "access_grant_id": sys.argv[3],
+    "course_id": sys.argv[4],
+    "student_id": sys.argv[5],
+    "parent_id": sys.argv[6],
+    "token": sys.argv[7],
+    "channel": resolve["channel"],
+    "discount": resolve["discount"],
+}
+json.dump(payload, open(sys.argv[2], "w"))
+PY
+    ATTR_REQUESTED_OUT="${TMP_DIR}/attr.requested.out.json"
+    ATTR_REQUESTED_STATUS="$(request_json "POST" "${ATTR_BASE_URL}/v1/internal/conversions/requested" "${ATTR_REQUESTED_PAYLOAD}" "${ATTR_REQUESTED_OUT}" -H "X-Service-Token: ${ATTR_SERVICE_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${ATTR_REQUESTED_STATUS}" "${ATTR_REQUESTED_OUT}" "record requested conversion"
+
+    log "Process payment confirmed event in attribution_service"
+    ATTR_CONFIRMED_PAYLOAD="${TMP_DIR}/attr.payment_confirmed.json"
+    cat > "${ATTR_CONFIRMED_PAYLOAD}" <<JSON
+{
+  "event_id": "smoke-payment-confirmed-${SMOKE_ID}",
+  "access_grant_id": "${ACCESS_GRANT_ID}",
+  "paid_amount": {
+    "amount": 100,
+    "currency": "USD"
+  },
+  "approved_by_admin_id": "admin-smoke"
+}
+JSON
+    ATTR_CONFIRMED_OUT="${TMP_DIR}/attr.payment_confirmed.out.json"
+    ATTR_CONFIRMED_STATUS="$(request_json "POST" "${ATTR_BASE_URL}/v1/internal/events/payment-confirmed" "${ATTR_CONFIRMED_PAYLOAD}" "${ATTR_CONFIRMED_OUT}" -H "X-Service-Token: ${ATTR_SERVICE_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${ATTR_CONFIRMED_STATUS}" "${ATTR_CONFIRMED_OUT}" "process payment confirmed event"
+
+    log "Read attribution campaign stats"
+    ATTR_STATS_OUT="${TMP_DIR}/attr.stats.out.json"
+    ATTR_STATS_STATUS="$(request_json "GET" "${ATTR_BASE_URL}/v1/admin/campaigns/stats?date_from=${TODAY_UTC}&date_to=${TODAY_UTC}&channel=${ATTR_CHANNEL}&campaign=${ATTR_CAMPAIGN}&source=${ATTR_SOURCE}&medium=${ATTR_MEDIUM}&limit=10&offset=0" "" "${ATTR_STATS_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${ATTR_STATS_STATUS}" "${ATTR_STATS_OUT}" "read attribution campaign stats"
+    ATTR_STATS_MATCH="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); campaign=sys.argv[2]; print(str(any(item.get("campaign")==campaign and item.get("clicks",0) >= 1 and item.get("requested",0) >= 1 and item.get("paid",0) >= 1 for item in d.get("items", []))).lower())' "${ATTR_STATS_OUT}" "${ATTR_CAMPAIGN}")"
+    if [[ "${ATTR_STATS_MATCH}" != "true" ]]; then
+      log "ERROR attribution campaign stats: expected campaign aggregate not found"
+      cat "${ATTR_STATS_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Read attribution campaign stats csv"
+    ATTR_CSV_OUT="${TMP_DIR}/attr.stats.csv"
+    curl -sS -H "Authorization: Bearer ${ACCESS_TOKEN}" "${ATTR_BASE_URL}/v1/admin/campaigns/stats.csv?date_from=${TODAY_UTC}&date_to=${TODAY_UTC}&channel=${ATTR_CHANNEL}&campaign=${ATTR_CAMPAIGN}&source=${ATTR_SOURCE}&medium=${ATTR_MEDIUM}" > "${ATTR_CSV_OUT}"
+    if ! grep -q "${ATTR_CAMPAIGN}" "${ATTR_CSV_OUT}"; then
+      log "ERROR attribution campaign csv: campaign row missing"
+      cat "${ATTR_CSV_OUT}"
+      echo
+      exit 1
+    fi
+  fi
 
   if [[ "${SMOKE_LEARNING_ENABLED}" == "1" ]]; then
     LESSON1_ID="lesson-smoke-${SMOKE_ID}-1"

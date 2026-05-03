@@ -45,11 +45,13 @@ post_deploy_smoke_required_services:
 smoke_auth_base_url: http://127.0.0.1:8000
 smoke_users_base_url: http://127.0.0.1:8002
 smoke_course_base_url: http://127.0.0.1:8001
+smoke_attr_base_url: http://127.0.0.1:8003
 smoke_live_base_url: http://127.0.0.1:8010
 smoke_payments_base_url: http://127.0.0.1:8004
 smoke_admin_email: admin@example.com
 smoke_admin_password: admin12345
 smoke_service_token: "{{ users_service_token }}"
+smoke_attribution_service_token: "{{ attribution_service_token }}"
 
 ops_cron_enabled: false
 ops_cron_ansible_dir: /home/deploy/apps/infra/ansible

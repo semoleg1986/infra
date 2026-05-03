@@ -226,6 +226,7 @@ crontab -e
   - бьет в `AUTH_BASE_URL=http://127.0.0.1:8000`
   - запускается как `K6_VUS=20`
   - работает `K6_DURATION=2m`
+  - регистрирует pool пользователей `K6_USER_POOL_SIZE` (по умолчанию `max(K6_VUS * 50, 1000)`), чтобы не утыкаться в login rate-limit на одном email
   - использует Docker image `grafana/k6:0.49.0`
 - Важно:
   - отдельная установка `k6` на сервер не нужна
@@ -233,7 +234,7 @@ crontab -e
   - для первого безопасного прогона лучше оставить дефолтный профиль и только потом повышать `K6_VUS`
 - Полезные overrides:
   ```bash
-  AUTH_BASE_URL=http://127.0.0.1:8000 K6_VUS=50 K6_DURATION=3m make load-auth-burst
+  AUTH_BASE_URL=http://127.0.0.1:8000 K6_VUS=50 K6_DURATION=3m K6_USER_POOL_SIZE=2500 make load-auth-burst
   ```
 - Использование существующего аккаунта вместо auto-register:
   ```bash
@@ -242,6 +243,9 @@ crontab -e
   AUTH_PASSWORD=LoadTest12345! \
   make load-auth-burst
   ```
+- Важно:
+  - если использовать один существующий аккаунт, сценарий почти наверняка упрется в `AUTH_RATE_LIMIT_LOGIN_MAX`
+  - для throughput baseline лучше оставлять auto-register pool mode
 
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:

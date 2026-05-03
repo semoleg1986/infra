@@ -9,6 +9,7 @@ AUTH_BASE_URL="${AUTH_BASE_URL:-http://127.0.0.1:8000}"
 K6_VUS="${K6_VUS:-20}"
 K6_DURATION="${K6_DURATION:-2m}"
 K6_THINK_TIME_SECONDS="${K6_THINK_TIME_SECONDS:-0.2}"
+K6_USER_POOL_SIZE="${K6_USER_POOL_SIZE:-}"
 K6_DOCKER_IMAGE="${K6_DOCKER_IMAGE:-grafana/k6:0.49.0}"
 
 log() {
@@ -34,6 +35,7 @@ log "AUTH_BASE_URL=${AUTH_BASE_URL}"
 log "K6_VUS=${K6_VUS}"
 log "K6_DURATION=${K6_DURATION}"
 log "K6_THINK_TIME_SECONDS=${K6_THINK_TIME_SECONDS}"
+log "K6_USER_POOL_SIZE=${K6_USER_POOL_SIZE:-auto}"
 log "K6_DOCKER_IMAGE=${K6_DOCKER_IMAGE}"
 log "Using Docker host network for server-local traffic"
 
@@ -48,5 +50,6 @@ exec docker run --rm \
   -e K6_VUS="${K6_VUS}" \
   -e K6_DURATION="${K6_DURATION}" \
   -e K6_THINK_TIME_SECONDS="${K6_THINK_TIME_SECONDS}" \
+  -e K6_USER_POOL_SIZE="${K6_USER_POOL_SIZE}" \
   "${K6_DOCKER_IMAGE}" \
   run /work/load/auth-burst.k6.js

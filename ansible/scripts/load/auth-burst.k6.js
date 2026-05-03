@@ -7,6 +7,7 @@ const registerEnabled = (__ENV.AUTH_REGISTER_ENABLED || 'true').toLowerCase() !=
 const vus = Number(__ENV.K6_VUS || 50);
 const duration = __ENV.K6_DURATION || '3m';
 const thinkTimeSeconds = Number(__ENV.K6_THINK_TIME_SECONDS || 0.2);
+const userPoolSize = Number(__ENV.K6_USER_POOL_SIZE || Math.max(vus * 50, 1000));
 
 const loginDuration = new Trend('auth_login_duration_ms');
 const meDuration = new Trend('auth_me_duration_ms');
@@ -34,30 +35,13 @@ function uniqueUser() {
   };
 }
 
-export function setup() {
-  const user = {
-    email: __ENV.AUTH_EMAIL,
-    password: __ENV.AUTH_PASSWORD,
-    default_role: __ENV.AUTH_DEFAULT_ROLE || 'parent',
-  };
-
-  if (user.email && user.password) {
-    return user;
-  }
-
-  if (!registerEnabled) {
-    throw new Error(
-      'AUTH_EMAIL/AUTH_PASSWORD are required when AUTH_REGISTER_ENABLED=false',
-    );
-  }
-
-  const generated = uniqueUser();
+function registerUser(user) {
   const response = http.post(
     `${authBaseUrl}/v1/auth/register`,
     JSON.stringify({
-      email: generated.email,
-      password: generated.password,
-      default_role: generated.default_role,
+      email: user.email,
+      password: user.password,
+      default_role: user.default_role,
     }),
     {
       headers: { 'Content-Type': 'application/json' },
@@ -72,11 +56,37 @@ export function setup() {
   if (response.status !== 200) {
     throw new Error(`register failed: HTTP ${response.status} ${response.body}`);
   }
-
-  return generated;
 }
 
-export default function (user) {
+export function setup() {
+  const user = {
+    email: __ENV.AUTH_EMAIL,
+    password: __ENV.AUTH_PASSWORD,
+    default_role: __ENV.AUTH_DEFAULT_ROLE || 'parent',
+  };
+
+  if (user.email && user.password) {
+    return { mode: 'single', users: [user] };
+  }
+
+  if (!registerEnabled) {
+    throw new Error(
+      'AUTH_EMAIL/AUTH_PASSWORD are required when AUTH_REGISTER_ENABLED=false',
+    );
+  }
+
+  const users = [];
+  for (let i = 0; i < userPoolSize; i += 1) {
+    const generated = uniqueUser();
+    registerUser(generated);
+    users.push(generated);
+  }
+  return { mode: 'pool', users };
+}
+
+export default function (data) {
+  const users = data.users || [];
+  const user = users[__ITER % users.length];
   const loginResponse = http.post(
     `${authBaseUrl}/v1/auth/login`,
     JSON.stringify({
@@ -99,6 +109,12 @@ export default function (user) {
   });
 
   if (!loginOk) {
+    if (loginResponse.status === 429) {
+      loginFailures.add(1);
+      successRate.add(false);
+      sleep(thinkTimeSeconds);
+      return;
+    }
     loginFailures.add(1);
     successRate.add(false);
     sleep(thinkTimeSeconds);

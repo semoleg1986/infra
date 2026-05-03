@@ -7,9 +7,11 @@ set -euo pipefail
 AUTH_BASE_URL="${AUTH_BASE_URL:-http://127.0.0.1:8000}"
 USERS_BASE_URL="${USERS_BASE_URL:-http://127.0.0.1:8002}"
 COURSE_BASE_URL="${COURSE_BASE_URL:-http://127.0.0.1:8001}"
+LIVE_BASE_URL="${LIVE_BASE_URL:-http://127.0.0.1:8010}"
 PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
 SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
 SMOKE_LEARNING_ENABLED="${SMOKE_LEARNING_ENABLED:-1}"
+SMOKE_LIVE_ENABLED="${SMOKE_LIVE_ENABLED:-0}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-1}"
 SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-}"
 
@@ -21,6 +23,16 @@ SERVICE_TOKEN="${SERVICE_TOKEN:-sometokencourse}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
+
+if [[ "${SMOKE_LIVE_ENABLED}" == "1" && "${SMOKE_PAYMENTS_ENABLED}" != "1" ]]; then
+  log "ERROR live smoke requires SMOKE_PAYMENTS_ENABLED=1"
+  exit 1
+fi
+
+if [[ "${SMOKE_LIVE_ENABLED}" == "1" && "${SMOKE_LEARNING_ENABLED}" != "1" ]]; then
+  log "ERROR live smoke requires SMOKE_LEARNING_ENABLED=1"
+  exit 1
+fi
 
 log() {
   printf '[smoke] %s\n' "$*"
@@ -76,6 +88,14 @@ if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
   code="$(curl -sS -o /dev/null -w '%{http_code}' "${PAYMENTS_BASE_URL}/healthz")"
   if [[ "${code}" != "200" ]]; then
     log "ERROR health check failed for ${PAYMENTS_BASE_URL}/healthz: HTTP ${code}"
+    exit 1
+  fi
+fi
+
+if [[ "${SMOKE_LIVE_ENABLED}" == "1" ]]; then
+  code="$(curl -sS -o /dev/null -w '%{http_code}' "${LIVE_BASE_URL}/healthz")"
+  if [[ "${code}" != "200" ]]; then
+    log "ERROR health check failed for ${LIVE_BASE_URL}/healthz: HTTP ${code}"
     exit 1
   fi
 fi
@@ -456,6 +476,119 @@ JSON
       cat "${PARENT_COMPLETED_OUT}"
       echo
       exit 1
+    fi
+
+    if [[ "${SMOKE_LIVE_ENABLED}" == "1" ]]; then
+      log "Create live room in live_class_service"
+      LIVE_ROOM_PAYLOAD="${TMP_DIR}/live.room.json"
+      cat > "${LIVE_ROOM_PAYLOAD}" <<JSON
+{
+  "courseId": "${PAYMENT_COURSE_ID}",
+  "lessonId": "${LESSON1_ID}",
+  "participantsLimit": 5
+}
+JSON
+      LIVE_ROOM_OUT="${TMP_DIR}/live.room.out.json"
+      LIVE_ROOM_STATUS="$(request_json "POST" "${LIVE_BASE_URL}/v1/live/rooms" "${LIVE_ROOM_PAYLOAD}" "${LIVE_ROOM_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+      assert_2xx "${LIVE_ROOM_STATUS}" "${LIVE_ROOM_OUT}" "create live room"
+
+      LIVE_ROOM_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["roomId"])' "${LIVE_ROOM_OUT}")"
+      if [[ -z "${LIVE_ROOM_ID}" ]]; then
+        log "ERROR create live room: roomId is empty"
+        cat "${LIVE_ROOM_OUT}"
+        echo
+        exit 1
+      fi
+
+      log "Student join live room with active course access"
+      LIVE_JOIN_OUT="${TMP_DIR}/live.join.out.json"
+      LIVE_JOIN_STATUS="$(request_json "POST" "${LIVE_BASE_URL}/v1/live/rooms/${LIVE_ROOM_ID}/join" "" "${LIVE_JOIN_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}" -H "Content-Type: application/json")"
+      assert_2xx "${LIVE_JOIN_STATUS}" "${LIVE_JOIN_OUT}" "student live join"
+
+      log "Student leave live room"
+      LIVE_LEAVE_PAYLOAD="${TMP_DIR}/live.leave.json"
+      cat > "${LIVE_LEAVE_PAYLOAD}" <<JSON
+{}
+JSON
+      LIVE_LEAVE_OUT="${TMP_DIR}/live.leave.out.json"
+      LIVE_LEAVE_STATUS="$(request_json "POST" "${LIVE_BASE_URL}/v1/live/rooms/${LIVE_ROOM_ID}/leave" "${LIVE_LEAVE_PAYLOAD}" "${LIVE_LEAVE_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}" -H "Content-Type: application/json")"
+      assert_2xx "${LIVE_LEAVE_STATUS}" "${LIVE_LEAVE_OUT}" "student live leave"
+
+      log "Admin reads live attendance"
+      LIVE_ATTENDANCE_OUT="${TMP_DIR}/live.attendance.out.json"
+      LIVE_ATTENDANCE_STATUS="$(request_json "GET" "${LIVE_BASE_URL}/v1/live/rooms/${LIVE_ROOM_ID}/attendance" "" "${LIVE_ATTENDANCE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+      assert_2xx "${LIVE_ATTENDANCE_STATUS}" "${LIVE_ATTENDANCE_OUT}" "live attendance read"
+      LIVE_ATTENDANCE_MATCH="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); student_id=sys.argv[2]; print(str(any(item.get("accountId")==student_id and item.get("sessionCount")==1 and item.get("lastLeftAt") for item in d)).lower())' "${LIVE_ATTENDANCE_OUT}" "${PAYMENT_STUDENT_ID}")"
+      if [[ "${LIVE_ATTENDANCE_MATCH}" != "true" ]]; then
+        log "ERROR live attendance read: student attendance record not found"
+        cat "${LIVE_ATTENDANCE_OUT}"
+        echo
+        exit 1
+      fi
+
+      log "Register denied student in auth_service"
+      DENIED_STUDENT_EMAIL="student.denied.${SMOKE_ID}@example.com"
+      DENIED_STUDENT_PASSWORD="${SMOKE_STUDENT_PASSWORD:-student12345}"
+      DENIED_REGISTER_PAYLOAD="${TMP_DIR}/student.denied.register.json"
+      cat > "${DENIED_REGISTER_PAYLOAD}" <<JSON
+{
+  "email": "${DENIED_STUDENT_EMAIL}",
+  "password": "${DENIED_STUDENT_PASSWORD}",
+  "default_role": "student"
+}
+JSON
+      DENIED_REGISTER_OUT="${TMP_DIR}/student.denied.register.out.json"
+      DENIED_REGISTER_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/register" "${DENIED_REGISTER_PAYLOAD}" "${DENIED_REGISTER_OUT}" -H "Content-Type: application/json")"
+      assert_2xx "${DENIED_REGISTER_STATUS}" "${DENIED_REGISTER_OUT}" "register denied student auth"
+
+      log "Denied student login in auth_service"
+      DENIED_LOGIN_PAYLOAD="${TMP_DIR}/student.denied.login.json"
+      cat > "${DENIED_LOGIN_PAYLOAD}" <<JSON
+{
+  "email": "${DENIED_STUDENT_EMAIL}",
+  "password": "${DENIED_STUDENT_PASSWORD}",
+  "session_fingerprint": "student-denied-smoke-${SMOKE_ID}"
+}
+JSON
+      DENIED_LOGIN_OUT="${TMP_DIR}/student.denied.login.out.json"
+      DENIED_LOGIN_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/login" "${DENIED_LOGIN_PAYLOAD}" "${DENIED_LOGIN_OUT}" -H "Content-Type: application/json")"
+      assert_2xx "${DENIED_LOGIN_STATUS}" "${DENIED_LOGIN_OUT}" "denied student login"
+      DENIED_STUDENT_ACCESS_TOKEN="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["access_token"])' "${DENIED_LOGIN_OUT}")"
+
+      log "Denied student cannot join live room without course access"
+      LIVE_DENIED_JOIN_OUT="${TMP_DIR}/live.denied.join.out.json"
+      LIVE_DENIED_JOIN_STATUS="$(request_json "POST" "${LIVE_BASE_URL}/v1/live/rooms/${LIVE_ROOM_ID}/join" "" "${LIVE_DENIED_JOIN_OUT}" -H "Authorization: Bearer ${DENIED_STUDENT_ACCESS_TOKEN}" -H "Content-Type: application/json")"
+      if [[ "${LIVE_DENIED_JOIN_STATUS}" != "403" ]]; then
+        log "ERROR denied live join: expected HTTP 403, got ${LIVE_DENIED_JOIN_STATUS}"
+        cat "${LIVE_DENIED_JOIN_OUT}"
+        echo
+        exit 1
+      fi
+
+      log "Live metrics"
+      LIVE_METRICS_OUT="${TMP_DIR}/live.metrics.out.txt"
+      curl -sS "${LIVE_BASE_URL}/metrics" > "${LIVE_METRICS_OUT}"
+      if ! grep -q 'live_room_participant_joins_total' "${LIVE_METRICS_OUT}"; then
+        log "ERROR live metrics: join metric family missing"
+        cat "${LIVE_METRICS_OUT}"
+        echo
+        exit 1
+      fi
+      if ! grep -q 'live_room_attendance_sessions_total' "${LIVE_METRICS_OUT}"; then
+        log "ERROR live metrics: attendance sessions metric family missing"
+        cat "${LIVE_METRICS_OUT}"
+        echo
+        exit 1
+      fi
+
+      log "Close live room"
+      LIVE_CLOSE_PAYLOAD="${TMP_DIR}/live.close.json"
+      cat > "${LIVE_CLOSE_PAYLOAD}" <<JSON
+{}
+JSON
+      LIVE_CLOSE_OUT="${TMP_DIR}/live.close.out.json"
+      LIVE_CLOSE_STATUS="$(request_json "POST" "${LIVE_BASE_URL}/v1/live/rooms/${LIVE_ROOM_ID}/close" "${LIVE_CLOSE_PAYLOAD}" "${LIVE_CLOSE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+      assert_2xx "${LIVE_CLOSE_STATUS}" "${LIVE_CLOSE_OUT}" "close live room"
     fi
   fi
 fi

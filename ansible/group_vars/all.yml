@@ -45,6 +45,7 @@ post_deploy_smoke_required_services:
 smoke_auth_base_url: http://127.0.0.1:8000
 smoke_users_base_url: http://127.0.0.1:8002
 smoke_course_base_url: http://127.0.0.1:8001
+smoke_live_base_url: http://127.0.0.1:8010
 smoke_payments_base_url: http://127.0.0.1:8004
 smoke_admin_email: admin@example.com
 smoke_admin_password: admin12345
@@ -263,6 +264,7 @@ services:
       LIVE_CLASS_AUTH_ISSUER: auth_service
       LIVE_CLASS_AUTH_AUDIENCE: platform_clients
       LIVE_CLASS_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+      LIVE_CLASS_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
       LIVE_CLASS_REDIS_URL: "{{ redis_internal_url }}"
       LIVE_CLASS_OUTBOX_STREAM: live_room.events
       LIVE_CLASS_OUTBOX_BATCH_SIZE: "100"

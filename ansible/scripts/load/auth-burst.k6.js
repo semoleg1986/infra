@@ -8,6 +8,7 @@ const vus = Number(__ENV.K6_VUS || 50);
 const duration = __ENV.K6_DURATION || '3m';
 const thinkTimeSeconds = Number(__ENV.K6_THINK_TIME_SECONDS || 0.2);
 const userPoolSize = Number(__ENV.K6_USER_POOL_SIZE || Math.max(vus * 50, 1000));
+const setupTimeout = __ENV.K6_SETUP_TIMEOUT || '15m';
 
 const loginDuration = new Trend('auth_login_duration_ms');
 const meDuration = new Trend('auth_me_duration_ms');
@@ -18,6 +19,7 @@ const successRate = new Rate('auth_flow_success_rate');
 export const options = {
   vus,
   duration,
+  setupTimeout,
   thresholds: {
     http_req_failed: ['rate<0.01'],
     auth_flow_success_rate: ['rate>0.99'],

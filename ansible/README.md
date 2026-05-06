@@ -302,6 +302,39 @@ crontab -e
   K6_VUS=5 K6_DURATION=2m K6_USER_POOL_SIZE=5 K6_SETUP_TIMEOUT=20m make load-payment-access-progress
   ```
 
+## Chaos / Failure Drill (Sprint 6 - 3.3)
+- Первый server-side drill:
+  - `scripts/chaos_auth_restart.sh`
+- Обертка запуска:
+  - `make chaos-auth-restart`
+- Что делает:
+  - многократно выполняет:
+    - `POST /v1/auth/login`
+    - `GET /v1/auth/me`
+    - `GET /v1/admin/users?limit=1&offset=0`
+  - посередине цикла делает `docker restart curs_auth_service`
+  - сравнивает `JWKS kid` до и после рестарта
+  - печатает итог:
+    - восстановился ли `auth_service`
+    - принимает ли `users_service` свежие токены после рестарта
+- Команда:
+  ```bash
+  make chaos-auth-restart
+  ```
+- Полезные overrides:
+  ```bash
+  AUTH_BASE_URL=http://127.0.0.1:8000 \
+  USERS_BASE_URL=http://127.0.0.1:8002 \
+  CHAOS_ITERATIONS=30 \
+  CHAOS_INTERVAL_SECONDS=1 \
+  CHAOS_RESTART_AT_ITERATION=10 \
+  make chaos-auth-restart
+  ```
+- Важно:
+  - если `auth_service` все еще использует ephemeral JWT keys, drill может завершиться кодом `2`
+  - это будет означать: `auth` уже поднялся, но `users_service` продолжает держать stale JWKS cache
+  - после перевода `auth_service` на persistent JWT keys этот drill должен становиться полностью зеленым без ручного рестарта consumers
+
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:
   - Prometheus alerts: `files/observability/prometheus-alerts.yml`

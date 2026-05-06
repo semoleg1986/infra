@@ -64,6 +64,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   make ops-check
   make load-auth-burst
   make load-live-room-burst
+  make load-payment-access-progress
   ```
 - По умолчанию используется `ENV=prod`. Для другого окружения:
   ```bash
@@ -275,6 +276,31 @@ crontab -e
   - этот профиль намеренно не меряет auth rate-limit
   - он нужен как baseline именно для `live join / leave / attendance`
   - чтобы не мерить artificial optimistic-lock contention на одной комнате, можно разносить `VU` по пулу комнат через `K6_ROOM_POOL_SIZE`
+
+- Третий server-side сценарий:
+  - `scripts/load/payment-access-progress.k6.js`
+- Обертка запуска:
+  - `scripts/load_payment_access_progress.sh`
+- Команда:
+  ```bash
+  make load-payment-access-progress
+  ```
+- По умолчанию сценарий:
+  - логинится admin-пользователем
+  - в `setup()` поднимает teacher/course/two published lessons
+  - создает parent + student pool
+  - основной цикл выполняет:
+    - `POST /v1/parent/payments/intents`
+    - `POST /v1/admin/payments/{id}/approve`
+    - `GET /internal/v1/access/{course_id}/{student_id}`
+    - `POST /v1/student/courses/{course_id}/lessons/{lesson_id}/complete`
+    - `GET /v1/student/courses/{course_id}/progress`
+    - `GET /v1/parent/students/{student_id}/courses/progress`
+    - `GET /v1/parent/students/{student_id}/courses/completed`
+- Полезные overrides:
+  ```bash
+  K6_VUS=5 K6_DURATION=2m K6_USER_POOL_SIZE=5 K6_SETUP_TIMEOUT=20m make load-payment-access-progress
+  ```
 
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:

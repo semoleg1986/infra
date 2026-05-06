@@ -31,7 +31,12 @@ const paymentApproveFailures = new Counter('payment_approve_failures_total');
 const accessCheckFailures = new Counter('payment_access_check_failures_total');
 const learningFailures = new Counter('learning_progress_failures_total');
 const paymentCreate409s = new Counter('payment_create_status_409_total');
+const paymentCreate400s = new Counter('payment_create_status_400_total');
+const paymentCreate401s = new Counter('payment_create_status_401_total');
+const paymentCreate403s = new Counter('payment_create_status_403_total');
 const paymentCreate422s = new Counter('payment_create_status_422_total');
+const paymentCreate429s = new Counter('payment_create_status_429_total');
+const paymentCreate5xxs = new Counter('payment_create_status_5xx_total');
 const paymentCreateOtherErrors = new Counter('payment_create_status_other_total');
 const paymentApproveAlreadyActive = new Counter('payment_approve_already_active_total');
 const paymentApproveOtherErrors = new Counter('payment_approve_status_other_total');
@@ -78,8 +83,18 @@ function isAlreadyActiveAccessError(response) {
 function classifyPaymentCreateFailure(response) {
   if (response.status === 409) {
     paymentCreate409s.add(1);
+  } else if (response.status === 400) {
+    paymentCreate400s.add(1);
+  } else if (response.status === 401) {
+    paymentCreate401s.add(1);
+  } else if (response.status === 403) {
+    paymentCreate403s.add(1);
   } else if (response.status === 422) {
     paymentCreate422s.add(1);
+  } else if (response.status === 429) {
+    paymentCreate429s.add(1);
+  } else if (response.status >= 500) {
+    paymentCreate5xxs.add(1);
   } else {
     paymentCreateOtherErrors.add(1);
   }

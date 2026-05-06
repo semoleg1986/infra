@@ -140,8 +140,8 @@ TEACHER_USER_ID="teacher-chaos-pay-${SMOKE_ID}"
 TEACHER_EMAIL="teacher.chaos.pay.${SMOKE_ID}@example.com"
 PARENT_EMAIL="parent.chaos.pay.${SMOKE_ID}@example.com"
 STUDENT_EMAIL="student.chaos.pay.${SMOKE_ID}@example.com"
-PARENT_USER_ID="parent-chaos-pay-${SMOKE_ID}"
-STUDENT_USER_ID="student-chaos-pay-${SMOKE_ID}"
+PAYMENT_PARENT_ID="parent-chaos-pay-${SMOKE_ID}"
+PAYMENT_STUDENT_ID="student-chaos-pay-${SMOKE_ID}"
 
 log "Bootstrap admin login"
 ADMIN_LOGIN_PAYLOAD="${TMP_DIR}/admin-login.json"
@@ -212,12 +212,16 @@ PARENT_LOGIN_OUT="${TMP_DIR}/parent-login.out.json"
 PARENT_LOGIN_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/login" "${PARENT_LOGIN_PAYLOAD}" "${PARENT_LOGIN_OUT}" -H "Content-Type: application/json")"
 assert_2xx "${PARENT_LOGIN_STATUS}" "${PARENT_LOGIN_OUT}" "parent login"
 PARENT_ACCESS_TOKEN="$(json_get "${PARENT_LOGIN_OUT}" "access_token")"
+PARENT_ME_OUT="${TMP_DIR}/parent-me.out.json"
+PARENT_ME_STATUS="$(request_json "GET" "${AUTH_BASE_URL}/v1/auth/me" "" "${PARENT_ME_OUT}" -H "Authorization: Bearer ${PARENT_ACCESS_TOKEN}")"
+assert_2xx "${PARENT_ME_STATUS}" "${PARENT_ME_OUT}" "parent auth me"
+PAYMENT_PARENT_ID="$(json_get "${PARENT_ME_OUT}" "account_id")"
 
 log "Create parent profile"
 PARENT_PAYLOAD="${TMP_DIR}/parent.json"
 cat >"${PARENT_PAYLOAD}" <<JSON
 {
-  "user_id": "${PARENT_USER_ID}",
+  "user_id": "${PAYMENT_PARENT_ID}",
   "email": "${PARENT_EMAIL}",
   "display_name": "Chaos Payments Parent ${SMOKE_ID}",
   "roles": ["parent"]
@@ -240,11 +244,29 @@ STUDENT_REGISTER_OUT="${TMP_DIR}/student-register.out.json"
 STUDENT_REGISTER_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/register" "${STUDENT_REGISTER_PAYLOAD}" "${STUDENT_REGISTER_OUT}" -H "Content-Type: application/json")"
 assert_2xx "${STUDENT_REGISTER_STATUS}" "${STUDENT_REGISTER_OUT}" "register student"
 
+log "Student login"
+STUDENT_LOGIN_PAYLOAD="${TMP_DIR}/student-login.json"
+cat >"${STUDENT_LOGIN_PAYLOAD}" <<JSON
+{
+  "email": "${STUDENT_EMAIL}",
+  "password": "${PARENT_PASSWORD}",
+  "session_fingerprint": "${SESSION_PREFIX}-student"
+}
+JSON
+STUDENT_LOGIN_OUT="${TMP_DIR}/student-login.out.json"
+STUDENT_LOGIN_STATUS="$(request_json "POST" "${AUTH_BASE_URL}/v1/auth/login" "${STUDENT_LOGIN_PAYLOAD}" "${STUDENT_LOGIN_OUT}" -H "Content-Type: application/json")"
+assert_2xx "${STUDENT_LOGIN_STATUS}" "${STUDENT_LOGIN_OUT}" "student login"
+STUDENT_ACCESS_TOKEN="$(json_get "${STUDENT_LOGIN_OUT}" "access_token")"
+STUDENT_ME_OUT="${TMP_DIR}/student-me.out.json"
+STUDENT_ME_STATUS="$(request_json "GET" "${AUTH_BASE_URL}/v1/auth/me" "" "${STUDENT_ME_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
+assert_2xx "${STUDENT_ME_STATUS}" "${STUDENT_ME_OUT}" "student auth me"
+PAYMENT_STUDENT_ID="$(json_get "${STUDENT_ME_OUT}" "user_id")"
+
 log "Create student profile"
 STUDENT_PAYLOAD="${TMP_DIR}/student.json"
 cat >"${STUDENT_PAYLOAD}" <<JSON
 {
-  "user_id": "${STUDENT_USER_ID}",
+  "user_id": "${PAYMENT_STUDENT_ID}",
   "email": "${STUDENT_EMAIL}",
   "display_name": "Chaos Payments Student ${SMOKE_ID}",
   "roles": ["student"]
@@ -258,8 +280,8 @@ log "Create parent-student link"
 LINK_PAYLOAD="${TMP_DIR}/parent-student-link.json"
 cat >"${LINK_PAYLOAD}" <<JSON
 {
-  "parent_id": "${PARENT_USER_ID}",
-  "student_id": "${STUDENT_USER_ID}",
+  "parent_id": "${PAYMENT_PARENT_ID}",
+  "student_id": "${PAYMENT_STUDENT_ID}",
   "note": "chaos-payments"
 }
 JSON
@@ -287,8 +309,8 @@ for ((i = 1; i <= CHAOS_ITERATIONS; i++)); do
   PAYMENT_PAYLOAD="${TMP_DIR}/payment-intent-${i}.json"
   cat >"${PAYMENT_PAYLOAD}" <<JSON
 {
-  "parent_id": "${PARENT_USER_ID}",
-  "student_id": "${STUDENT_USER_ID}",
+  "parent_id": "${PAYMENT_PARENT_ID}",
+  "student_id": "${PAYMENT_STUDENT_ID}",
   "course_id": "${COURSE_ID}",
   "idempotency_key": "chaos-pay-${SMOKE_ID}-${i}"
 }
@@ -324,7 +346,7 @@ JSON
   fi
 
   ACCESS_OUT="${TMP_DIR}/access-${i}.out.json"
-  ACCESS_STATUS="$(request_json "GET" "${PAYMENTS_BASE_URL}/internal/v1/access/${COURSE_ID}/${STUDENT_USER_ID}" "" "${ACCESS_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
+  ACCESS_STATUS="$(request_json "GET" "${PAYMENTS_BASE_URL}/internal/v1/access/${COURSE_ID}/${PAYMENT_STUDENT_ID}" "" "${ACCESS_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
   if [[ "${ACCESS_STATUS}" == "200" ]]; then
     ACCESS_HAS_VALUE="$(json_get "${ACCESS_OUT}" "has_access" 2>/dev/null || true)"
     if [[ "${ACCESS_HAS_VALUE}" == "True" || "${ACCESS_HAS_VALUE}" == "true" ]]; then

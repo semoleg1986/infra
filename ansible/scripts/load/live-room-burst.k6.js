@@ -12,6 +12,7 @@ const duration = __ENV.K6_DURATION || '2m';
 const thinkTimeSeconds = Number(__ENV.K6_THINK_TIME_SECONDS || 0.2);
 const setupTimeout = __ENV.K6_SETUP_TIMEOUT || '20m';
 const studentPoolSize = Number(__ENV.K6_USER_POOL_SIZE || Math.max(vus, 10));
+const roomPoolSize = Number(__ENV.K6_ROOM_POOL_SIZE || Math.max(vus, 1));
 const serviceToken = __ENV.SERVICE_TOKEN || 'sometokencourse';
 const adminEmail = __ENV.ADMIN_EMAIL || 'admin@example.com';
 const adminPassword = __ENV.ADMIN_PASSWORD || 'admin12345';
@@ -370,24 +371,32 @@ export function setup() {
     });
   }
 
-  const roomId = createRoom(adminToken, courseId, lessonId, studentPoolSize + 20);
+  const rooms = [];
+  for (let i = 0; i < roomPoolSize; i += 1) {
+    rooms.push(createRoom(adminToken, courseId, lessonId, studentPoolSize + 20));
+  }
   return {
     adminToken,
-    roomId,
+    rooms,
     students,
   };
 }
 
 export default function (data) {
   const students = data.students || [];
+  const rooms = data.rooms || [];
   if (students.length === 0) {
     throw new Error('setup did not provide students');
   }
+  if (rooms.length === 0) {
+    throw new Error('setup did not provide rooms');
+  }
   const student = students[(__VU - 1) % students.length];
-  const expectedVersion = getRoomVersion(data.roomId, student.accessToken);
+  const roomId = rooms[(__VU - 1) % rooms.length];
+  const expectedVersion = getRoomVersion(roomId, student.accessToken);
 
   const joinResponse = http.post(
-    `${liveBaseUrl}/v1/live/rooms/${data.roomId}/join`,
+    `${liveBaseUrl}/v1/live/rooms/${roomId}/join`,
     JSON.stringify({ expectedVersion }),
     {
       headers: jsonHeaders({ Authorization: `Bearer ${student.accessToken}` }),
@@ -421,7 +430,7 @@ export default function (data) {
   }
 
   const leaveResponse = http.post(
-    `${liveBaseUrl}/v1/live/rooms/${data.roomId}/leave`,
+    `${liveBaseUrl}/v1/live/rooms/${roomId}/leave`,
     JSON.stringify({ expectedVersion: joinedVersion }),
     {
       headers: jsonHeaders({ Authorization: `Bearer ${student.accessToken}` }),
@@ -440,7 +449,7 @@ export default function (data) {
   }
 
   const attendanceResponse = http.get(
-    `${liveBaseUrl}/v1/live/rooms/${data.roomId}/attendance`,
+    `${liveBaseUrl}/v1/live/rooms/${roomId}/attendance`,
     {
       headers: { Authorization: `Bearer ${data.adminToken}` },
       tags: { endpoint: 'live_attendance' },

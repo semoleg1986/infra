@@ -269,11 +269,12 @@ crontab -e
     - `attendance read`
 - Полезные overrides:
   ```bash
-  K6_VUS=20 K6_DURATION=2m K6_USER_POOL_SIZE=20 K6_SETUP_TIMEOUT=20m make load-live-room-burst
+  K6_VUS=20 K6_DURATION=2m K6_USER_POOL_SIZE=20 K6_ROOM_POOL_SIZE=20 K6_SETUP_TIMEOUT=20m make load-live-room-burst
   ```
 - Важно:
   - этот профиль намеренно не меряет auth rate-limit
   - он нужен как baseline именно для `live join / leave / attendance`
+  - чтобы не мерить artificial optimistic-lock contention на одной комнате, можно разносить `VU` по пулу комнат через `K6_ROOM_POOL_SIZE`
 
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:

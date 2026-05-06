@@ -43,10 +43,13 @@ export const options = {
 };
 
 function jsonHeaders(extra = {}) {
-  return {
+  const headers = {
     'Content-Type': 'application/json',
-    ...extra,
   };
+  Object.keys(extra).forEach((key) => {
+    headers[key] = extra[key];
+  });
+  return headers;
 }
 
 function require2xx(response, step) {

@@ -30,6 +30,11 @@ const paymentCreateFailures = new Counter('payment_create_failures_total');
 const paymentApproveFailures = new Counter('payment_approve_failures_total');
 const accessCheckFailures = new Counter('payment_access_check_failures_total');
 const learningFailures = new Counter('learning_progress_failures_total');
+const paymentCreate409s = new Counter('payment_create_status_409_total');
+const paymentCreate422s = new Counter('payment_create_status_422_total');
+const paymentCreateOtherErrors = new Counter('payment_create_status_other_total');
+const paymentApproveAlreadyActive = new Counter('payment_approve_already_active_total');
+const paymentApproveOtherErrors = new Counter('payment_approve_status_other_total');
 
 export const options = {
   vus,
@@ -68,6 +73,16 @@ function isAlreadyActiveAccessError(response) {
     typeof response.body === 'string' &&
     response.body.indexOf('уже существует active доступ') !== -1
   );
+}
+
+function classifyPaymentCreateFailure(response) {
+  if (response.status === 409) {
+    paymentCreate409s.add(1);
+  } else if (response.status === 422) {
+    paymentCreate422s.add(1);
+  } else {
+    paymentCreateOtherErrors.add(1);
+  }
 }
 
 function register(email, password, defaultRole) {
@@ -334,6 +349,7 @@ export default function (data) {
   });
   if (!paymentCreateOk) {
     paymentCreateFailures.add(1);
+    classifyPaymentCreateFailure(paymentResponse);
     successRate.add(false);
     sleep(thinkTimeSeconds);
     return;
@@ -355,12 +371,17 @@ export default function (data) {
     },
   );
   paymentApproveDuration.add(approveResponse.timings.duration);
-  const approveOk =
-    check(approveResponse, {
-      'payment approve status is 2xx': (r) => r.status >= 200 && r.status < 300,
-    }) || isAlreadyActiveAccessError(approveResponse);
+  const approveStatus2xx = check(approveResponse, {
+    'payment approve status is 2xx': (r) => r.status >= 200 && r.status < 300,
+  });
+  const approveAlreadyActive = isAlreadyActiveAccessError(approveResponse);
+  if (approveAlreadyActive) {
+    paymentApproveAlreadyActive.add(1);
+  }
+  const approveOk = approveStatus2xx || approveAlreadyActive;
   if (!approveOk) {
     paymentApproveFailures.add(1);
+    paymentApproveOtherErrors.add(1);
     successRate.add(false);
     sleep(thinkTimeSeconds);
     return;

@@ -63,6 +63,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   make restore-drill BACKUP_DIR=~/backups/postgres/<timestamp>
   make ops-check
   make load-auth-burst
+  make load-live-room-burst
   ```
 - По умолчанию используется `ENV=prod`. Для другого окружения:
   ```bash
@@ -247,6 +248,32 @@ crontab -e
 - Важно:
   - если использовать один существующий аккаунт, сценарий почти наверняка упрется в `AUTH_RATE_LIMIT_LOGIN_MAX`
   - для throughput baseline лучше оставлять auto-register pool mode
+
+- Второй server-side сценарий:
+  - `scripts/load/live-room-burst.k6.js`
+- Обертка запуска:
+  - `scripts/load_live_room_burst.sh`
+- Команда:
+  ```bash
+  make load-live-room-burst
+  ```
+- По умолчанию сценарий:
+  - логинится admin-пользователем
+  - в `setup()` поднимает teacher/course/published lesson
+  - создает parent + pool student-аккаунтов
+  - выдает course access через `payments_service`
+  - создает один live room с лимитом участников выше пула
+  - в основном цикле каждый VU работает со своим student identity:
+    - `join`
+    - `leave`
+    - `attendance read`
+- Полезные overrides:
+  ```bash
+  K6_VUS=20 K6_DURATION=2m K6_USER_POOL_SIZE=20 K6_SETUP_TIMEOUT=20m make load-live-room-burst
+  ```
+- Важно:
+  - этот профиль намеренно не меряет auth rate-limit
+  - он нужен как baseline именно для `live join / leave / attendance`
 
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:

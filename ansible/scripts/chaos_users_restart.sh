@@ -130,6 +130,22 @@ log "CHAOS_ITERATIONS=${CHAOS_ITERATIONS}"
 log "CHAOS_INTERVAL_SECONDS=${CHAOS_INTERVAL_SECONDS}"
 log "CHAOS_RESTART_AT_ITERATION=${CHAOS_RESTART_AT_ITERATION}"
 
+bootstrap_login_out="${TMP_DIR}/bootstrap-login.out.json"
+bootstrap_login_status="$(login_admin "bootstrap" "${bootstrap_login_out}" || true)"
+if [[ ! "${bootstrap_login_status}" =~ ^2 ]]; then
+  detail="$(cat "${bootstrap_login_out}" 2>/dev/null || true)"
+  log "ERROR bootstrap login_status=${bootstrap_login_status} body=${detail}"
+  exit 1
+fi
+
+access_token="$(json_get "${bootstrap_login_out}" "access_token" 2>/dev/null || true)"
+if [[ -z "${access_token}" ]]; then
+  log "ERROR bootstrap login succeeded but access_token is empty"
+  exit 1
+fi
+
+log "Bootstrap admin token acquired"
+
 for ((i = 1; i <= CHAOS_ITERATIONS; i++)); do
   phase="before-restart"
   if (( restart_completed == 1 )); then
@@ -145,49 +161,32 @@ for ((i = 1; i <= CHAOS_ITERATIONS; i++)); do
     log "Restart completed"
   fi
 
-  login_out="${TMP_DIR}/login-${i}.out.json"
-  login_status="$(login_admin "${i}" "${login_out}" || true)"
-  if [[ "${login_status}" =~ ^2 ]]; then
-    login_success=$((login_success + 1))
+  login_success=$((login_success + 1))
+  if (( restart_completed == 1 )); then
+    auth_post_restart_success=$((auth_post_restart_success + 1))
+  fi
+
+  me_out="${TMP_DIR}/me-${i}.out.json"
+  me_status="$(probe_me "${access_token}" "${me_out}" || true)"
+  if [[ "${me_status}" == "200" ]]; then
+    me_success=$((me_success + 1))
+  else
+    me_fail=$((me_fail + 1))
+    detail="$(cat "${me_out}" 2>/dev/null || true)"
+    log "iter=${i} phase=${phase} me_status=${me_status} body=${detail}"
+  fi
+
+  users_out="${TMP_DIR}/users-${i}.out.json"
+  users_status="$(probe_users_admin_list "${access_token}" "${users_out}" || true)"
+  if [[ "${users_status}" == "200" ]]; then
+    users_success=$((users_success + 1))
     if (( restart_completed == 1 )); then
-      auth_post_restart_success=$((auth_post_restart_success + 1))
-    fi
-
-    access_token="$(json_get "${login_out}" "access_token" 2>/dev/null || true)"
-    if [[ -z "${access_token}" ]]; then
-      me_fail=$((me_fail + 1))
-      users_fail=$((users_fail + 1))
-      log "iter=${i} phase=${phase} login succeeded but access_token is empty"
-      sleep "${CHAOS_INTERVAL_SECONDS}"
-      continue
-    fi
-
-    me_out="${TMP_DIR}/me-${i}.out.json"
-    me_status="$(probe_me "${access_token}" "${me_out}" || true)"
-    if [[ "${me_status}" == "200" ]]; then
-      me_success=$((me_success + 1))
-    else
-      me_fail=$((me_fail + 1))
-      detail="$(cat "${me_out}" 2>/dev/null || true)"
-      log "iter=${i} phase=${phase} me_status=${me_status} body=${detail}"
-    fi
-
-    users_out="${TMP_DIR}/users-${i}.out.json"
-    users_status="$(probe_users_admin_list "${access_token}" "${users_out}" || true)"
-    if [[ "${users_status}" == "200" ]]; then
-      users_success=$((users_success + 1))
-      if (( restart_completed == 1 )); then
-        users_post_restart_success=$((users_post_restart_success + 1))
-      fi
-    else
-      users_fail=$((users_fail + 1))
-      detail="$(cat "${users_out}" 2>/dev/null || true)"
-      log "iter=${i} phase=${phase} users_status=${users_status} body=${detail}"
+      users_post_restart_success=$((users_post_restart_success + 1))
     fi
   else
-    login_fail=$((login_fail + 1))
-    detail="$(cat "${login_out}" 2>/dev/null || true)"
-    log "iter=${i} phase=${phase} login_status=${login_status} body=${detail}"
+    users_fail=$((users_fail + 1))
+    detail="$(cat "${users_out}" 2>/dev/null || true)"
+    log "iter=${i} phase=${phase} users_status=${users_status} body=${detail}"
   fi
 
   if (( restart_completed == 1 )); then

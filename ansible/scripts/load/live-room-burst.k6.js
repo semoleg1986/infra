@@ -175,9 +175,10 @@ function createCourse(accessToken, teacherId, suffix) {
       lesson_id: lessonId,
       title: 'Load Lesson 1',
       description: 'load',
+      content_type: 'video',
       content_ref: `cdn://load/${suffix}/1`,
-      sort_order: 1,
-      is_published: true,
+      duration_minutes: 15,
+      is_preview: false,
     }),
     {
       headers: jsonHeaders({ Authorization: `Bearer ${accessToken}` }),
@@ -185,6 +186,30 @@ function createCourse(accessToken, teacherId, suffix) {
     },
   );
   require2xx(lessonResponse, 'create lesson');
+
+  const lessonPublishResponse = http.patch(
+    `${courseBaseUrl}/v1/admin/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}`,
+    JSON.stringify({
+      status: 'published',
+    }),
+    {
+      headers: jsonHeaders({ Authorization: `Bearer ${accessToken}` }),
+      tags: { endpoint: 'course_lesson_publish' },
+    },
+  );
+  require2xx(lessonPublishResponse, 'publish lesson');
+
+  const modulePublishResponse = http.patch(
+    `${courseBaseUrl}/v1/admin/courses/${courseId}/modules/${moduleId}`,
+    JSON.stringify({
+      status: 'published',
+    }),
+    {
+      headers: jsonHeaders({ Authorization: `Bearer ${accessToken}` }),
+      tags: { endpoint: 'course_module_publish' },
+    },
+  );
+  require2xx(modulePublishResponse, 'publish module');
 
   const publishResponse = http.post(
     `${courseBaseUrl}/v1/admin/courses/${courseId}/publish`,

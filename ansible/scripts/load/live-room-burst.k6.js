@@ -257,6 +257,25 @@ function createPaymentAccess(parentToken, adminToken, parentId, courseId, studen
   require2xx(approveResponse, `approve payment intent ${paymentIntentId}`);
 }
 
+function waitForAccess(courseId, studentId) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = http.get(
+      `${paymentsBaseUrl}/internal/v1/access/${courseId}/${studentId}`,
+      {
+        headers: { 'X-Service-Token': serviceToken },
+        tags: { endpoint: 'payments_internal_access' },
+      },
+    );
+    require2xx(response, `internal access check ${studentId}`);
+    const hasAccess = response.json('has_access');
+    if (hasAccess === true) {
+      return;
+    }
+    sleep(0.2);
+  }
+  throw new Error(`internal access check did not become ready for student ${studentId}`);
+}
+
 function createRoom(adminToken, courseId, lessonId, participantsLimit) {
   const response = http.post(
     `${liveBaseUrl}/v1/live/rooms`,
@@ -330,6 +349,7 @@ export function setup() {
       studentUserId,
       studentSuffix,
     );
+    waitForAccess(courseId, studentUserId);
     students.push({
       userId: studentUserId,
       email,

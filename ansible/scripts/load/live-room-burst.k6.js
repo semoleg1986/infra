@@ -224,10 +224,11 @@ function createCourse(accessToken, teacherId, suffix) {
   return { courseId, lessonId };
 }
 
-function createPaymentAccess(parentToken, adminToken, courseId, studentId, suffix) {
+function createPaymentAccess(parentToken, adminToken, parentId, courseId, studentId, suffix) {
   const paymentIntentResponse = http.post(
     `${paymentsBaseUrl}/v1/parent/payments/intents`,
     JSON.stringify({
+      parent_id: parentId,
       student_id: studentId,
       course_id: courseId,
       amount_minor: 10000,
@@ -321,7 +322,14 @@ export function setup() {
       roles: ['student'],
     });
     createParentStudentLink(adminToken, parentUserId, studentUserId);
-    createPaymentAccess(parentToken, adminToken, courseId, studentUserId, studentSuffix);
+    createPaymentAccess(
+      parentToken,
+      adminToken,
+      parentUserId,
+      courseId,
+      studentUserId,
+      studentSuffix,
+    );
     students.push({
       userId: studentUserId,
       email,

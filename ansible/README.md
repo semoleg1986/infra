@@ -363,6 +363,42 @@ crontab -e
   make chaos-users-restart
   ```
 
+- Третий server-side drill:
+  - `scripts/chaos_payments_restart.sh`
+- Обертка запуска:
+  - `make chaos-payments-restart`
+- Что делает:
+  - в bootstrap поднимает минимальный контур:
+    - teacher
+    - course
+    - parent + student
+    - parent-student link
+  - потом многократно выполняет:
+    - `POST /v1/parent/payments/intents`
+    - `POST /v1/admin/payments/{id}/approve`
+    - `GET /internal/v1/access/{course_id}/{student_id}`
+    - `GET /healthz` для `payments_service` после restart
+  - посередине цикла делает `docker restart curs_payments_service`
+  - печатает итог:
+    - восстановился ли `create-intent` path
+    - восстановился ли `access-check` path
+- Команда:
+  ```bash
+  SERVICE_TOKEN=sometokencourse make chaos-payments-restart
+  ```
+- Полезные overrides:
+  ```bash
+  AUTH_BASE_URL=http://127.0.0.1:8000 \
+  USERS_BASE_URL=http://127.0.0.1:8002 \
+  COURSE_BASE_URL=http://127.0.0.1:8001 \
+  PAYMENTS_BASE_URL=http://127.0.0.1:8004 \
+  SERVICE_TOKEN=sometokencourse \
+  CHAOS_ITERATIONS=20 \
+  CHAOS_INTERVAL_SECONDS=1 \
+  CHAOS_RESTART_AT_ITERATION=8 \
+  make chaos-payments-restart
+  ```
+
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:
   - Prometheus alerts: `files/observability/prometheus-alerts.yml`

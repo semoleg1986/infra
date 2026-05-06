@@ -6,6 +6,8 @@ course_service_token: "{{ vault_course_service_token }}"
 users_service_token: "{{ vault_users_service_token | default(vault_course_service_token) }}"
 payments_service_token: "{{ vault_payments_service_token | default(vault_course_service_token) }}"
 attribution_service_token: "{{ vault_attribution_service_token | default(vault_course_service_token) }}"
+auth_jwt_private_key_pem: "{{ vault_auth_jwt_private_key_pem }}"
+auth_jwt_public_key_pem: "{{ vault_auth_jwt_public_key_pem }}"
 db_suffix: _prod
 ops_cron_enabled: true
 prometheus_enabled: true

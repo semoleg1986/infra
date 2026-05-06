@@ -35,6 +35,8 @@ course_service_token: dev-service-token
 users_service_token: "{{ course_service_token }}"
 payments_service_token: "{{ course_service_token }}"
 attribution_service_token: "{{ course_service_token }}"
+auth_jwt_private_key_pem: "{{ vault_auth_jwt_private_key_pem | default(None) }}"
+auth_jwt_public_key_pem: "{{ vault_auth_jwt_public_key_pem | default(None) }}"
 
 post_deploy_smoke_enabled: true
 post_deploy_smoke_required_services:
@@ -152,6 +154,8 @@ services:
       AUTH_JWT_AUDIENCE: platform_clients
       AUTH_JWT_ACCESS_TTL_SECONDS: "3600"
       AUTH_JWT_REFRESH_TTL_SECONDS: "2592000"
+      AUTH_JWT_PRIVATE_KEY_PEM: "{{ auth_jwt_private_key_pem }}"
+      AUTH_JWT_PUBLIC_KEY_PEM: "{{ auth_jwt_public_key_pem }}"
     migration_command:
       - alembic
       - upgrade

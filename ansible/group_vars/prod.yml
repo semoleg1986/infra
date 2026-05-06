@@ -26,6 +26,12 @@ service_resources_overrides:
       mem_limit: "2g"
       mem_reservation: "512m"
       pids_limit: 512
+  auth_service:
+    resources:
+      cpus: "1.50"
+      mem_limit: "2g"
+      mem_reservation: "512m"
+      pids_limit: 512
   redis:
     resources:
       cpus: "0.50"

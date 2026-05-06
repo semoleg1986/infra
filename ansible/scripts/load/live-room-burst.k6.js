@@ -276,6 +276,19 @@ function waitForAccess(courseId, studentId) {
   throw new Error(`internal access check did not become ready for student ${studentId}`);
 }
 
+function getRoomVersion(roomId, accessToken) {
+  const response = http.get(`${liveBaseUrl}/v1/live/rooms/${roomId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    tags: { endpoint: 'live_room_get' },
+  });
+  require2xx(response, `get live room ${roomId}`);
+  const version = response.json('version');
+  if (typeof version !== 'number') {
+    throw new Error(`live room ${roomId} returned invalid version`);
+  }
+  return version;
+}
+
 function createRoom(adminToken, courseId, lessonId, participantsLimit) {
   const response = http.post(
     `${liveBaseUrl}/v1/live/rooms`,
@@ -371,10 +384,11 @@ export default function (data) {
     throw new Error('setup did not provide students');
   }
   const student = students[(__VU - 1) % students.length];
+  const expectedVersion = getRoomVersion(data.roomId, student.accessToken);
 
   const joinResponse = http.post(
     `${liveBaseUrl}/v1/live/rooms/${data.roomId}/join`,
-    null,
+    JSON.stringify({ expectedVersion }),
     {
       headers: jsonHeaders({ Authorization: `Bearer ${student.accessToken}` }),
       tags: { endpoint: 'live_join' },
@@ -397,10 +411,18 @@ export default function (data) {
     sleep(thinkTimeSeconds);
     return;
   }
+  const joinedVersion = joinResponse.json('version');
+  if (typeof joinedVersion !== 'number') {
+    joinFailures.add(1);
+    joinOtherErrors.add(1);
+    successRate.add(false);
+    sleep(thinkTimeSeconds);
+    return;
+  }
 
   const leaveResponse = http.post(
     `${liveBaseUrl}/v1/live/rooms/${data.roomId}/leave`,
-    JSON.stringify({}),
+    JSON.stringify({ expectedVersion: joinedVersion }),
     {
       headers: jsonHeaders({ Authorization: `Bearer ${student.accessToken}` }),
       tags: { endpoint: 'live_leave' },

@@ -335,6 +335,34 @@ crontab -e
   - это будет означать: `auth` уже поднялся, но `users_service` продолжает держать stale JWKS cache
   - после перевода `auth_service` на persistent JWT keys этот drill должен становиться полностью зеленым без ручного рестарта consumers
 
+- Второй server-side drill:
+  - `scripts/chaos_users_restart.sh`
+- Обертка запуска:
+  - `make chaos-users-restart`
+- Что делает:
+  - многократно выполняет:
+    - `POST /v1/auth/login`
+    - `GET /v1/auth/me`
+    - `GET /v1/admin/users?limit=1&offset=0`
+    - `GET /healthz` для `users_service` после restart
+  - посередине цикла делает `docker restart curs_users_service`
+  - печатает итог:
+    - оставался ли `auth_service` доступным
+    - восстановился ли `users_service` в пределах окна drill
+- Команда:
+  ```bash
+  make chaos-users-restart
+  ```
+- Полезные overrides:
+  ```bash
+  AUTH_BASE_URL=http://127.0.0.1:8000 \
+  USERS_BASE_URL=http://127.0.0.1:8002 \
+  CHAOS_ITERATIONS=30 \
+  CHAOS_INTERVAL_SECONDS=1 \
+  CHAOS_RESTART_AT_ITERATION=10 \
+  make chaos-users-restart
+  ```
+
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:
   - Prometheus alerts: `files/observability/prometheus-alerts.yml`

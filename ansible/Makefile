@@ -8,7 +8,7 @@ VARS := -e @group_vars/all.yml -e @group_vars/$(ENV).yml -e @group_vars/vault.ym
 ASK_FLAGS ?= --ask-vault-pass -K
 COMMON := ANSIBLE_ROLES_PATH=./roles ansible-playbook -i $(INVENTORY) -c local $(VARS) $(ASK_FLAGS)
 
-.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill ops-check load-auth-burst load-live-room-burst load-payment-access-progress chaos-auth-restart chaos-users-restart chaos-payments-restart
+.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill ops-check load-auth-burst load-live-room-burst load-payment-access-progress chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
 
 help:
 	@echo "make deploy                          # full deploy for ENV=$(ENV)"
@@ -27,6 +27,7 @@ help:
 	@echo "make chaos-auth-restart              # restart auth_service mid-drill and verify recovery"
 	@echo "make chaos-users-restart             # restart users_service mid-drill and verify recovery"
 	@echo "make chaos-payments-restart          # restart payments_service mid-drill and verify recovery"
+	@echo "make chaos-redis-live                # restart redis mid-drill and verify live recovery"
 	@echo "make ping                            # ansible ping"
 
 ping:
@@ -89,3 +90,6 @@ chaos-users-restart:
 
 chaos-payments-restart:
 	./scripts/chaos_payments_restart.sh
+
+chaos-redis-live:
+	SERVICE_TOKEN="$(SERVICE_TOKEN)" ./scripts/chaos_redis_live.sh

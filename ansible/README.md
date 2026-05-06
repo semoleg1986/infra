@@ -399,6 +399,32 @@ crontab -e
   make chaos-payments-restart
   ```
 
+- Optional infra-level drill:
+  - `scripts/chaos_redis_live.sh`
+- Обертка запуска:
+  - `make chaos-redis-live`
+- Что делает:
+  - в bootstrap поднимает минимальный contour для `live_class_service`:
+    - teacher
+    - published course/lesson
+    - parent + student
+    - parent-student link
+    - payment access
+    - live room
+  - потом многократно выполняет:
+    - `POST /v1/live/rooms/{roomId}/join`
+    - `POST /v1/live/rooms/{roomId}/leave`
+    - `GET /v1/live/rooms/{roomId}/attendance`
+    - `GET /healthz` у `live_class_service` после restart
+  - посередине цикла делает `docker restart curs_redis`
+  - печатает итог:
+    - восстановился ли join path
+    - восстановился ли attendance path
+- Команда:
+  ```bash
+  SERVICE_TOKEN=sometokencourse make chaos-redis-live
+  ```
+
 ## Alerts & Dashboard (Sprint 5 - 2.3)
 - Готовые артефакты:
   - Prometheus alerts: `files/observability/prometheus-alerts.yml`

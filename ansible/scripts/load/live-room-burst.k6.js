@@ -382,7 +382,7 @@ export default function (data) {
   );
   joinDuration.add(joinResponse.timings.duration);
   const joinOk = check(joinResponse, {
-    'live join status is 200': (r) => r.status === 200,
+    'live join status is 201': (r) => r.status === 201,
   });
   if (!joinOk) {
     joinFailures.add(1);
@@ -408,7 +408,7 @@ export default function (data) {
   );
   leaveDuration.add(leaveResponse.timings.duration);
   const leaveOk = check(leaveResponse, {
-    'live leave status is 200': (r) => r.status === 200,
+    'live leave status is 201': (r) => r.status === 201,
   });
   if (!leaveOk) {
     leaveFailures.add(1);

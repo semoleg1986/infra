@@ -40,6 +40,7 @@ const paymentCreate5xxs = new Counter('payment_create_status_5xx_total');
 const paymentCreateOtherErrors = new Counter('payment_create_status_other_total');
 const paymentApproveAlreadyActive = new Counter('payment_approve_already_active_total');
 const paymentApproveOtherErrors = new Counter('payment_approve_status_other_total');
+const paymentApproveExpectedStatuses = http.expectedStatuses({ min: 200, max: 299 }, 400);
 
 export const options = {
   vus,
@@ -383,6 +384,7 @@ export default function (data) {
     {
       headers: jsonHeaders({ Authorization: `Bearer ${data.adminToken}` }),
       tags: { endpoint: 'payments_approve_intent' },
+      responseCallback: paymentApproveExpectedStatuses,
     },
   );
   paymentApproveDuration.add(approveResponse.timings.duration);

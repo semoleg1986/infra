@@ -8,6 +8,16 @@
     mode: "0755"
   when: service.enabled | default(true)
 
+- name: Render service extra templates
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0644') }}"
+  loop: "{{ service.templates | default([]) }}"
+  when: service.enabled | default(true)
+
 - name: Render service env file
   ansible.builtin.template:
     src: env.j2

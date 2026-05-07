@@ -35,6 +35,7 @@ course_service_token: dev-service-token
 users_service_token: "{{ course_service_token }}"
 payments_service_token: "{{ course_service_token }}"
 attribution_service_token: "{{ course_service_token }}"
+observability_metrics_token: "{{ course_service_token }}"
 auth_jwt_private_key_pem: "{{ vault_auth_jwt_private_key_pem | default(None) }}"
 auth_jwt_public_key_pem: "{{ vault_auth_jwt_public_key_pem | default(None) }}"
 
@@ -76,6 +77,10 @@ services:
     image: prom/prometheus
     tag: "v2.53.1"
     container_name: curs_prometheus
+    templates:
+      - src: prometheus.yml.j2
+        dest: "{{ project_root }}/prometheus/prometheus.yml"
+        mode: "0644"
     env: {}
     command: >
       --config.file=/etc/prometheus/prometheus.yml
@@ -85,7 +90,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - "{{ observability_assets_root }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "{{ project_root }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
       - "{{ observability_assets_root }}/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro"
       - "{{ project_root }}/volumes/prometheus:/prometheus"
     healthcheck:
@@ -156,6 +161,7 @@ services:
       AUTH_JWT_REFRESH_TTL_SECONDS: "2592000"
       AUTH_JWT_PRIVATE_KEY_PEM: "{{ auth_jwt_private_key_pem }}"
       AUTH_JWT_PUBLIC_KEY_PEM: "{{ auth_jwt_public_key_pem }}"
+      AUTH_METRICS_TOKEN: "{{ observability_metrics_token }}"
     migration_command:
       - alembic
       - upgrade
@@ -185,6 +191,7 @@ services:
       USERS_AUTH_AUDIENCE: platform_clients
       USERS_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
       USERS_SERVICE_TOKEN: "{{ users_service_token }}"
+      USERS_METRICS_TOKEN: "{{ observability_metrics_token }}"
     migration_command:
       - alembic
       - upgrade
@@ -216,6 +223,7 @@ services:
       COURSE_SERVICE_TOKEN: "{{ course_service_token }}"
       COURSE_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
       COURSE_USERS_SERVICE_TOKEN: "{{ users_service_token }}"
+      COURSE_METRICS_TOKEN: "{{ observability_metrics_token }}"
     migration_command:
       - alembic
       - upgrade
@@ -275,6 +283,7 @@ services:
       LIVE_CLASS_OUTBOX_STREAM: live_room.events
       LIVE_CLASS_OUTBOX_BATCH_SIZE: "100"
       LIVE_CLASS_OUTBOX_POLL_INTERVAL_MS: "1000"
+      LIVE_CLASS_METRICS_TOKEN: "{{ observability_metrics_token }}"
       LIVE_CLASS_DATABASE_URL: "postgresql://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/live_class_service{{ db_suffix }}"
       LIVE_CLASS_TURN_URL: "turn:localhost:3478"
       LIVE_CLASS_TURN_USERNAME: turn-user
@@ -315,6 +324,7 @@ services:
       PAYMENTS_ATTR_SERVICE_BASE_URL: "{{ attribution_service_internal_url }}"
       PAYMENTS_ATTR_SERVICE_TOKEN: "{{ attribution_service_token }}"
       PAYMENTS_ATTR_SERVICE_TIMEOUT_SECONDS: "2"
+      PAYMENTS_METRICS_TOKEN: "{{ observability_metrics_token }}"
     migration_command:
       - alembic
       - upgrade

@@ -10,12 +10,14 @@
 
 - name: Render service extra templates
   ansible.builtin.template:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
+    src: "{{ service_template.src }}"
+    dest: "{{ service_template.dest }}"
     owner: root
     group: root
-    mode: "{{ item.mode | default('0644') }}"
+    mode: "{{ service_template.mode | default('0644') }}"
   loop: "{{ service.templates | default([]) }}"
+  loop_control:
+    loop_var: service_template
   when: service.enabled | default(true)
 
 - name: Render service env file

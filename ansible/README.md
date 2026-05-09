@@ -89,6 +89,11 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Для runtime hardening можно задать лимиты контейнеров:
   - `service_default_resources` (общие лимиты для всех сервисов),
   - `service_resources_overrides` (точечные overrides по имени сервиса).
+- Для network exposure baseline доступны bind-host knobs:
+  - `api_public_bind_host` — bind для API сервисов (по умолчанию `0.0.0.0`)
+  - `web_public_bind_host` — bind для web/admin/studio (по умолчанию `0.0.0.0`)
+  - `observability_bind_host` — bind для Prometheus/Grafana (по умолчанию `127.0.0.1`)
+  - Это позволяет ужесточать surface area без полной перестройки compose-шаблона.
 - Docker daemon log rotation также управляется через Ansible (`roles/docker`):
   - `docker_log_driver` (по умолчанию `json-file`)
   - `docker_log_max_size` (по умолчанию `10m`)

@@ -25,16 +25,19 @@ postgres_databases:
   - "attribution_service{{ db_suffix }}"
   - "live_class_service{{ db_suffix }}"
   - "payments_service{{ db_suffix }}"
+  - "bonus_wallet_service{{ db_suffix }}"
 
 auth_service_internal_url: http://curs_auth_service:8000
 users_service_internal_url: http://curs_users_service:8002
 course_service_internal_url: http://curs_course_service:8001
 attribution_service_internal_url: http://curs_attribution_service:8000
+bonus_wallet_service_internal_url: http://curs_bonus_wallet_service:8006
 redis_internal_url: redis://curs_redis:6379/0
 course_service_token: dev-service-token
 users_service_token: "{{ course_service_token }}"
 payments_service_token: "{{ course_service_token }}"
 attribution_service_token: "{{ course_service_token }}"
+bonus_wallet_service_token: "{{ course_service_token }}"
 observability_metrics_token: "{{ course_service_token }}"
 auth_jwt_private_key_pem: "{{ vault_auth_jwt_private_key_pem | default(None) }}"
 auth_jwt_public_key_pem: "{{ vault_auth_jwt_public_key_pem | default(None) }}"
@@ -328,6 +331,9 @@ services:
       PAYMENTS_ATTR_SERVICE_BASE_URL: "{{ attribution_service_internal_url }}"
       PAYMENTS_ATTR_SERVICE_TOKEN: "{{ attribution_service_token }}"
       PAYMENTS_ATTR_SERVICE_TIMEOUT_SECONDS: "2"
+      PAYMENTS_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
+      PAYMENTS_BONUS_SERVICE_TOKEN: "{{ bonus_wallet_service_token }}"
+      PAYMENTS_BONUS_SERVICE_TIMEOUT_SECONDS: "2"
       PAYMENTS_METRICS_TOKEN: "{{ observability_metrics_token }}"
     migration_command:
       - alembic
@@ -338,6 +344,36 @@ services:
     healthcheck:
       path: /healthz
       port: 8004
+
+  bonus_wallet_service:
+    enabled: true
+    workdir: "{{ project_root }}/bonus_wallet_service"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/bonus_wallet_service"
+    tag: "{{ service_image_tags.bonus_wallet_service | default(service_image_tag) }}"
+    migration_db: "bonus_wallet_service{{ db_suffix }}"
+    migration_stamp_revision: "20260509_0001"
+    migration_stamp_probe_table: bonus_accounts
+    migration_stamp_head_probe_table: bonus_rules
+    migration_stamp_head_revision: "20260509_0001"
+    container_name: curs_bonus_wallet_service
+    env:
+      BONUS_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/bonus_wallet_service{{ db_suffix }}"
+      BONUS_USE_INMEMORY: "0"
+      BONUS_AUTO_CREATE_SCHEMA: "0"
+      BONUS_AUTH_ISSUER: auth_service
+      BONUS_AUTH_AUDIENCE: platform_clients
+      BONUS_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
+      BONUS_SERVICE_TOKEN: "{{ bonus_wallet_service_token }}"
+      BONUS_METRICS_TOKEN: "{{ observability_metrics_token }}"
+    migration_command:
+      - alembic
+      - upgrade
+      - head
+    ports:
+      - "{{ api_public_bind_host }}:8006:8006"
+    healthcheck:
+      path: /healthz
+      port: 8006
 
   web_app:
     enabled: true

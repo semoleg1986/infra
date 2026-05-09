@@ -10,7 +10,9 @@ COURSE_BASE_URL="${COURSE_BASE_URL:-http://127.0.0.1:8001}"
 LIVE_BASE_URL="${LIVE_BASE_URL:-http://127.0.0.1:8010}"
 ATTR_BASE_URL="${ATTR_BASE_URL:-http://127.0.0.1:8003}"
 PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
+BONUS_BASE_URL="${BONUS_BASE_URL:-http://127.0.0.1:8006}"
 SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
+SMOKE_BONUS_ENABLED="${SMOKE_BONUS_ENABLED:-0}"
 SMOKE_LEARNING_ENABLED="${SMOKE_LEARNING_ENABLED:-1}"
 SMOKE_LIVE_ENABLED="${SMOKE_LIVE_ENABLED:-0}"
 SMOKE_ATTRIBUTION_ENABLED="${SMOKE_ATTRIBUTION_ENABLED:-0}"
@@ -23,6 +25,7 @@ SESSION_FINGERPRINT="${SESSION_FINGERPRINT:-prod-smoke-$(date +%s)}"
 
 SERVICE_TOKEN="${SERVICE_TOKEN:-sometokencourse}"
 ATTR_SERVICE_TOKEN="${ATTR_SERVICE_TOKEN:-${SERVICE_TOKEN}}"
+BONUS_SERVICE_TOKEN="${BONUS_SERVICE_TOKEN:-${SERVICE_TOKEN}}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -43,6 +46,11 @@ fi
 
 if [[ "${SMOKE_ATTRIBUTION_ENABLED}" == "1" && "${SMOKE_PAYMENTS_ENABLED}" != "1" ]]; then
   log "ERROR attribution smoke requires SMOKE_PAYMENTS_ENABLED=1"
+  exit 1
+fi
+
+if [[ "${SMOKE_BONUS_ENABLED}" == "1" && "${SMOKE_PAYMENTS_ENABLED}" != "1" ]]; then
+  log "ERROR bonus smoke requires SMOKE_PAYMENTS_ENABLED=1"
   exit 1
 fi
 
@@ -96,6 +104,14 @@ if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
   code="$(curl -sS -o /dev/null -w '%{http_code}' "${PAYMENTS_BASE_URL}/healthz")"
   if [[ "${code}" != "200" ]]; then
     log "ERROR health check failed for ${PAYMENTS_BASE_URL}/healthz: HTTP ${code}"
+    exit 1
+  fi
+fi
+
+if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
+  code="$(curl -sS -o /dev/null -w '%{http_code}' "${BONUS_BASE_URL}/healthz")"
+  if [[ "${code}" != "200" ]]; then
+    log "ERROR health check failed for ${BONUS_BASE_URL}/healthz: HTTP ${code}"
     exit 1
   fi
 fi
@@ -370,6 +386,25 @@ JSON
     assert_2xx "${LINK_STATUS}" "${LINK_OUT}" "create parent-student link"
   fi
 
+  BONUS_REQUESTED_AMOUNT=0
+  if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
+    BONUS_REQUESTED_AMOUNT=30
+    log "Accrue bonus balance in bonus_wallet_service"
+    BONUS_ACCRUAL_PAYLOAD="${TMP_DIR}/bonus_accrual.json"
+    cat > "${BONUS_ACCRUAL_PAYLOAD}" <<JSON
+{
+  "parent_id": "${PAYMENT_PARENT_ID}",
+  "amount": ${BONUS_REQUESTED_AMOUNT},
+  "reason_code": "smoke_reward",
+  "reference_id": "smoke-${SMOKE_ID}",
+  "idempotency_key": "smoke-bonus-accrual-${SMOKE_ID}"
+}
+JSON
+    BONUS_ACCRUAL_OUT="${TMP_DIR}/bonus_accrual.out.json"
+    BONUS_ACCRUAL_STATUS="$(request_json "POST" "${BONUS_BASE_URL}/internal/v1/bonus/accruals" "${BONUS_ACCRUAL_PAYLOAD}" "${BONUS_ACCRUAL_OUT}" -H "X-Service-Token: ${BONUS_SERVICE_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${BONUS_ACCRUAL_STATUS}" "${BONUS_ACCRUAL_OUT}" "accrue bonus balance"
+  fi
+
   log "Create payment intent in payments_service"
   PAYMENT_PAYLOAD="${TMP_DIR}/payment_intent.json"
   cat > "${PAYMENT_PAYLOAD}" <<JSON
@@ -377,6 +412,7 @@ JSON
   "parent_id": "${PAYMENT_PARENT_ID}",
   "student_id": "${PAYMENT_STUDENT_ID}",
   "course_id": "${PAYMENT_COURSE_ID}",
+  "bonus_amount": ${BONUS_REQUESTED_AMOUNT},
   "idempotency_key": "smoke-pay-${SMOKE_ID}-${RANDOM}"
 }
 JSON
@@ -391,6 +427,16 @@ JSON
     cat "${PAYMENT_OUT}"
     echo
     exit 1
+  fi
+
+  if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
+    ALLOWED_BONUS_AMOUNT="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("bonus_amount",0))' "${PAYMENT_OUT}")"
+    if [[ "${ALLOWED_BONUS_AMOUNT}" != "${BONUS_REQUESTED_AMOUNT}" ]]; then
+      log "ERROR create payment intent: expected bonus_amount=${BONUS_REQUESTED_AMOUNT}, got ${ALLOWED_BONUS_AMOUNT}"
+      cat "${PAYMENT_OUT}"
+      echo
+      exit 1
+    fi
   fi
 
   log "Approve payment intent in payments_service"
@@ -430,6 +476,20 @@ JSON
 
   log "payments_intent_id=${PAYMENT_INTENT_ID}"
   log "payments_access_grant_id=${ACCESS_GRANT_ID}"
+
+  if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
+    log "Check bonus balance after approve"
+    BONUS_BALANCE_OUT="${TMP_DIR}/bonus_balance.out.json"
+    BONUS_BALANCE_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/internal/v1/bonus/balance/${PAYMENT_PARENT_ID}" "" "${BONUS_BALANCE_OUT}" -H "X-Service-Token: ${BONUS_SERVICE_TOKEN}")"
+    assert_2xx "${BONUS_BALANCE_STATUS}" "${BONUS_BALANCE_OUT}" "bonus balance after approve"
+    BONUS_BALANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("balance",-1))' "${BONUS_BALANCE_OUT}")"
+    if [[ "${BONUS_BALANCE}" != "0" ]]; then
+      log "ERROR bonus balance after approve: expected 0, got ${BONUS_BALANCE}"
+      cat "${BONUS_BALANCE_OUT}"
+      echo
+      exit 1
+    fi
+  fi
 
   if [[ "${SMOKE_ATTRIBUTION_ENABLED}" == "1" ]]; then
     TODAY_UTC="$(date -u +%F)"

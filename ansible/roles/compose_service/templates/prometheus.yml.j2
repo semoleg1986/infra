@@ -46,6 +46,18 @@ scrape_configs:
       credentials: "{{ observability_metrics_token }}"
 {% endif %}
 
+{% if services.bonus_wallet_service.enabled | default(false) %}
+  - job_name: bonus_wallet_service
+    static_configs:
+      - targets: ["curs_bonus_wallet_service:8006"]
+    metrics_path: /metrics
+{% if observability_metrics_token | default('') | trim %}
+    authorization:
+      type: Bearer
+      credentials: "{{ observability_metrics_token }}"
+{% endif %}
+{% endif %}
+
 {% if services.attribution_service.enabled | default(false) %}
   - job_name: attribution_service
     static_configs:

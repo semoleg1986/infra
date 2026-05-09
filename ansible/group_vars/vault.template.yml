@@ -17,6 +17,7 @@ vault_course_service_token: "<COURSE_SERVICE_INTERNAL_TOKEN>"
 vault_users_service_token: "<USERS_SERVICE_INTERNAL_TOKEN>"
 vault_payments_service_token: "<PAYMENTS_SERVICE_INTERNAL_TOKEN>"
 vault_attribution_service_token: "<ATTRIBUTION_SERVICE_INTERNAL_TOKEN>"
+vault_bonus_wallet_service_token: "<BONUS_WALLET_SERVICE_INTERNAL_TOKEN>"
 
 # optional turn credentials (если будете использовать)
 vault_live_class_turn_username: "<TURN_USERNAME>"

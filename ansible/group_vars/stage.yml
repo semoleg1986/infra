@@ -28,3 +28,4 @@ course_service_token: "{{ vault_course_service_token | default('stage-service-to
 users_service_token: "{{ vault_users_service_token | default(course_service_token) }}"
 payments_service_token: "{{ vault_payments_service_token | default(course_service_token) }}"
 attribution_service_token: "{{ vault_attribution_service_token | default(course_service_token) }}"
+bonus_wallet_service_token: "{{ vault_bonus_wallet_service_token | default(course_service_token) }}"

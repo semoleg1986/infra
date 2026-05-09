@@ -9,7 +9,7 @@ POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
 BACKUP_DIR="${BACKUP_DIR:-}"
 RESTORE_SUFFIX="${RESTORE_SUFFIX:-_drill}"
-DBS="${DBS:-auth_service_prod,users_service_prod,course_service_prod,attribution_service_prod,live_class_service_prod,payments_service_prod}"
+DBS="${DBS:-auth_service_prod,users_service_prod,course_service_prod,attribution_service_prod,live_class_service_prod,payments_service_prod,bonus_wallet_service_prod}"
 
 if [[ -z "${BACKUP_DIR}" ]]; then
   echo "[restore] BACKUP_DIR is required"

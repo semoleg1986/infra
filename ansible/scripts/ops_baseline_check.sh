@@ -23,6 +23,7 @@ USERS_BASE_URL="${USERS_BASE_URL:-http://127.0.0.1:8002/healthz}"
 COURSE_BASE_URL="${COURSE_BASE_URL:-http://127.0.0.1:8001/healthz}"
 ATTR_BASE_URL="${ATTR_BASE_URL:-http://127.0.0.1:8003/healthz}"
 PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004/healthz}"
+BONUS_BASE_URL="${BONUS_BASE_URL:-http://127.0.0.1:8006/healthz}"
 LIVE_BASE_URL="${LIVE_BASE_URL:-http://127.0.0.1:8010/healthz}"
 WEB_BASE_URL="${WEB_BASE_URL:-http://127.0.0.1:3000/api/health}"
 ADMIN_BASE_URL="${ADMIN_BASE_URL:-http://127.0.0.1:3001/api/health}"
@@ -88,6 +89,7 @@ check_http() {
     "${COURSE_BASE_URL}" \
     "${ATTR_BASE_URL}" \
     "${PAYMENTS_BASE_URL}" \
+    "${BONUS_BASE_URL}" \
     "${LIVE_BASE_URL}" \
     "${WEB_BASE_URL}" \
     "${ADMIN_BASE_URL}" \
@@ -109,6 +111,7 @@ check_recent_5xx() {
     "${DOCKER_PREFIX}course_service" \
     "${DOCKER_PREFIX}attribution_service" \
     "${DOCKER_PREFIX}payments_service" \
+    "${DOCKER_PREFIX}bonus_wallet_service" \
     "${DOCKER_PREFIX}live_class_service" \
     "${DOCKER_PREFIX}web_app" \
     "${DOCKER_PREFIX}admin_app" \

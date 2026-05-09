@@ -52,7 +52,7 @@
       },
       "targets": [
         {
-          "expr": "sum(up{job=~\"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service\"})",
+          "expr": "sum(up{job=~\"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service\"})",
           "refId": "A"
         }
       ],
@@ -79,7 +79,7 @@
       "id": 2,
       "targets": [
         {
-          "expr": "sum by(service) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service\"}[5m]))",
+          "expr": "sum by(service) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service\"}[5m]))",
           "legendFormat": "{{service}}",
           "refId": "A"
         }
@@ -107,7 +107,7 @@
       "id": 3,
       "targets": [
         {
-          "expr": "sum by(service) (rate(http_request_duration_seconds_sum{service=~\"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service\"}[5m])) / clamp_min(sum by(service) (rate(http_request_duration_seconds_count{service=~\"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service\"}[5m])), 1)",
+          "expr": "sum by(service) (rate(http_request_duration_seconds_sum{service=~\"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service\"}[5m])) / clamp_min(sum by(service) (rate(http_request_duration_seconds_count{service=~\"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service\"}[5m])), 1)",
           "legendFormat": "{{service}}",
           "refId": "A"
         }
@@ -135,7 +135,7 @@
       "id": 4,
       "targets": [
         {
-          "expr": "sum by(service) (rate(http_errors_total{service=~\"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service\",status=~\"5..\"}[5m])) / clamp_min(sum by(service) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service\"}[5m])), 1)",
+          "expr": "sum by(service) (rate(http_errors_total{service=~\"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service\",status=~\"5..\"}[5m])) / clamp_min(sum by(service) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service\"}[5m])), 1)",
           "legendFormat": "{{service}}",
           "refId": "A"
         }
@@ -163,7 +163,7 @@
       "id": 5,
       "targets": [
         {
-          "expr": "sum by(service,status) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service\"}[5m]))",
+          "expr": "sum by(service,status) (rate(http_requests_total{service=~\"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service\"}[5m]))",
           "legendFormat": "{{service}} / {{status}}",
           "refId": "A"
         }

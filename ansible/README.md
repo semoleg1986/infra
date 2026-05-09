@@ -86,6 +86,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Для связки `course_service -> users_service` задайте `users_service_token` (или `vault_users_service_token`).
 - Для `payments_service` задайте `payments_service_token` (или `vault_payments_service_token`).
 - Для связки `payments_service -> attribution_service` задайте `attribution_service_token` (или `vault_attribution_service_token`).
+- Для `bonus_wallet_service` задайте `bonus_wallet_service_token` (или `vault_bonus_wallet_service_token`).
 - Для runtime hardening можно задать лимиты контейнеров:
   - `service_default_resources` (общие лимиты для всех сервисов),
   - `service_resources_overrides` (точечные overrides по имени сервиса).
@@ -101,7 +102,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 - Сервисы деплоятся per-service compose, но в единую внешнюю сеть `{{ docker_shared_network | default('curs_net') }}`.
 - Production управляется только через Ansible (`/opt/curs/*` compose-файлы).
 - Не запускайте параллельно `docker compose` из `~/apps/curs`, чтобы не получать конфликты `container_name`.
-- Для `auth_service`, `users_service`, `course_service`, `attribution_service`, `payments_service` миграции запускаются автоматически (`alembic upgrade head`) перед стартом контейнера.
+- Для `auth_service`, `users_service`, `course_service`, `attribution_service`, `payments_service`, `bonus_wallet_service` миграции запускаются автоматически (`alembic upgrade head`) перед стартом контейнера.
 - Перед миграцией добавлен pre-check рассинхрона (`schema есть, alembic_version пуст`) с автоматическим `alembic stamp` по сервисному revision guard.
 
 ## GHCR
@@ -168,7 +169,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 
 4. (Опционально) удалить drill-базы после проверки:
    ```bash
-   for db in auth_service_prod_drill users_service_prod_drill course_service_prod_drill attribution_service_prod_drill live_class_service_prod_drill payments_service_prod_drill; do
+   for db in auth_service_prod_drill users_service_prod_drill course_service_prod_drill attribution_service_prod_drill live_class_service_prod_drill payments_service_prod_drill bonus_wallet_service_prod_drill; do
      sudo docker exec curs_postgres psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS \"$db\";"
   done
   ```

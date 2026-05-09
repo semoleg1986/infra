@@ -3,7 +3,7 @@ groups:
     interval: 30s
     rules:
       - alert: CursApiServiceDown
-        expr: up{job=~"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service"} == 0
+        expr: up{job=~"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service"} == 0
         for: 2m
         labels:
           severity: critical
@@ -15,7 +15,7 @@ groups:
       - alert: CursApi5xxDetected
         expr: |
           sum by (service) (
-            rate(http_errors_total{service=~"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service",status=~"5.."}[5m])
+            rate(http_errors_total{service=~"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service",status=~"5.."}[5m])
           ) > 0
         for: 5m
         labels:
@@ -29,12 +29,12 @@ groups:
         expr: |
           (
             sum by (service) (
-              rate(http_errors_total{service=~"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service",status=~"5.."}[5m])
+              rate(http_errors_total{service=~"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service",status=~"5.."}[5m])
             )
             /
             clamp_min(
               sum by (service) (
-                rate(http_requests_total{service=~"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service"}[5m])
+                rate(http_requests_total{service=~"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service"}[5m])
               ),
               1
             )
@@ -51,12 +51,12 @@ groups:
         expr: |
           (
             sum by (service) (
-              rate(http_request_duration_seconds_sum{service=~"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service"}[5m])
+              rate(http_request_duration_seconds_sum{service=~"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service"}[5m])
             )
             /
             clamp_min(
               sum by (service) (
-                rate(http_request_duration_seconds_count{service=~"auth_service|users_service|course_service|payments_service|attribution_service|live_class_service"}[5m])
+                rate(http_request_duration_seconds_count{service=~"auth_service|users_service|course_service|payments_service|bonus_wallet_service|attribution_service|live_class_service"}[5m])
               ),
               1
             )

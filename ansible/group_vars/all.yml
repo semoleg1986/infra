@@ -256,6 +256,7 @@ services:
       ATTR_AUTH_AUDIENCE: platform_clients
       ATTR_AUTH_JWKS_URL: "{{ auth_service_internal_url }}/.well-known/jwks.json"
       ATTR_SERVICE_TOKEN: "{{ attribution_service_token }}"
+      ATTR_METRICS_TOKEN: "{{ observability_metrics_token }}"
     migration_command:
       - alembic
       - upgrade

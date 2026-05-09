@@ -46,6 +46,18 @@ scrape_configs:
       credentials: "{{ observability_metrics_token }}"
 {% endif %}
 
+{% if services.attribution_service.enabled | default(false) %}
+  - job_name: attribution_service
+    static_configs:
+      - targets: ["curs_attribution_service:8000"]
+    metrics_path: /metrics
+{% if observability_metrics_token | default('') | trim %}
+    authorization:
+      type: Bearer
+      credentials: "{{ observability_metrics_token }}"
+{% endif %}
+{% endif %}
+
 {% if services.live_class_service.enabled | default(false) %}
   - job_name: live_class_service
     static_configs:

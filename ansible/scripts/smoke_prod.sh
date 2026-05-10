@@ -13,6 +13,7 @@ PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
 BONUS_BASE_URL="${BONUS_BASE_URL:-http://127.0.0.1:8006}"
 SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
 SMOKE_BONUS_ENABLED="${SMOKE_BONUS_ENABLED:-0}"
+SMOKE_BONUS_COURSE_COMPLETION_POINTS="${SMOKE_BONUS_COURSE_COMPLETION_POINTS:-25}"
 SMOKE_LEARNING_ENABLED="${SMOKE_LEARNING_ENABLED:-1}"
 SMOKE_LIVE_ENABLED="${SMOKE_LIVE_ENABLED:-0}"
 SMOKE_ATTRIBUTION_ENABLED="${SMOKE_ATTRIBUTION_ENABLED:-0}"
@@ -646,6 +647,20 @@ JSON
       cat "${STUDENT_COMPLETE2_OUT}"
       echo
       exit 1
+    fi
+
+    if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
+      log "Check bonus balance after course completion"
+      BONUS_BALANCE_AFTER_LEARNING_OUT="${TMP_DIR}/bonus.balance.after_learning.out.json"
+      BONUS_BALANCE_AFTER_LEARNING_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/internal/v1/bonus/balance/${PAYMENT_PARENT_ID}" "" "${BONUS_BALANCE_AFTER_LEARNING_OUT}" -H "X-Service-Token: ${BONUS_SERVICE_TOKEN}")"
+      assert_2xx "${BONUS_BALANCE_AFTER_LEARNING_STATUS}" "${BONUS_BALANCE_AFTER_LEARNING_OUT}" "bonus balance after course completion"
+      BONUS_BALANCE_AFTER_LEARNING="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("balance",-1))' "${BONUS_BALANCE_AFTER_LEARNING_OUT}")"
+      if [[ "${BONUS_BALANCE_AFTER_LEARNING}" != "${SMOKE_BONUS_COURSE_COMPLETION_POINTS}" ]]; then
+        log "ERROR bonus balance after course completion: expected ${SMOKE_BONUS_COURSE_COMPLETION_POINTS}, got ${BONUS_BALANCE_AFTER_LEARNING}"
+        cat "${BONUS_BALANCE_AFTER_LEARNING_OUT}"
+        echo
+        exit 1
+      fi
     fi
 
     log "Student read own progress"

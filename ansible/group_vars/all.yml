@@ -229,6 +229,12 @@ services:
       COURSE_SERVICE_TOKEN: "{{ course_service_token }}"
       COURSE_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
       COURSE_USERS_SERVICE_TOKEN: "{{ users_service_token }}"
+      COURSE_USERS_SERVICE_TIMEOUT_SECONDS: "2"
+      COURSE_BONUS_ENABLED: "1"
+      COURSE_BONUS_COURSE_COMPLETION_POINTS: "25"
+      COURSE_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
+      COURSE_BONUS_SERVICE_TOKEN: "{{ bonus_wallet_service_token }}"
+      COURSE_BONUS_SERVICE_TIMEOUT_SECONDS: "2"
       COURSE_METRICS_TOKEN: "{{ observability_metrics_token }}"
     migration_command:
       - alembic

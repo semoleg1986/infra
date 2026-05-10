@@ -31,6 +31,7 @@ auth_service_internal_url: http://curs_auth_service:8000
 users_service_internal_url: http://curs_users_service:8002
 course_service_internal_url: http://curs_course_service:8001
 attribution_service_internal_url: http://curs_attribution_service:8000
+payments_service_internal_url: http://curs_payments_service:8004
 bonus_wallet_service_internal_url: http://curs_bonus_wallet_service:8006
 redis_internal_url: redis://curs_redis:6379/0
 course_service_token: dev-service-token
@@ -391,6 +392,10 @@ services:
     tag: "{{ service_image_tags.web_app | default(service_image_tag) }}"
     container_name: curs_web_app
     env:
+      NUXT_AUTH_SERVICE_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
+      NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
+      NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3000"
     ports:
@@ -406,6 +411,10 @@ services:
     tag: "{{ service_image_tags.admin_app | default(service_image_tag) }}"
     container_name: curs_admin_app
     env:
+      NUXT_AUTH_SERVICE_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
+      NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
+      NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3001"
     ports:
@@ -421,6 +430,10 @@ services:
     tag: "{{ service_image_tags.studio_app | default(service_image_tag) }}"
     container_name: curs_studio_app
     env:
+      NUXT_AUTH_SERVICE_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
+      NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
+      NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3002"
     ports:

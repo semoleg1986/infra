@@ -490,6 +490,123 @@ JSON
       echo
       exit 1
     fi
+
+    log "Parent reads own bonus balance"
+    BONUS_PARENT_BALANCE_OUT="${TMP_DIR}/bonus_parent_balance.out.json"
+    BONUS_PARENT_BALANCE_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/parent/bonus/balance" "" "${BONUS_PARENT_BALANCE_OUT}" -H "Authorization: Bearer ${PARENT_ACCESS_TOKEN}")"
+    assert_2xx "${BONUS_PARENT_BALANCE_STATUS}" "${BONUS_PARENT_BALANCE_OUT}" "parent bonus balance"
+    BONUS_PARENT_BALANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("balance",-1))' "${BONUS_PARENT_BALANCE_OUT}")"
+    if [[ "${BONUS_PARENT_BALANCE}" != "0" ]]; then
+      log "ERROR parent bonus balance after approve: expected 0, got ${BONUS_PARENT_BALANCE}"
+      cat "${BONUS_PARENT_BALANCE_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Parent reads own bonus ledger"
+    BONUS_PARENT_LEDGER_OUT="${TMP_DIR}/bonus_parent_ledger.out.json"
+    BONUS_PARENT_LEDGER_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/parent/bonus/ledger?limit=20&offset=0" "" "${BONUS_PARENT_LEDGER_OUT}" -H "Authorization: Bearer ${PARENT_ACCESS_TOKEN}")"
+    assert_2xx "${BONUS_PARENT_LEDGER_STATUS}" "${BONUS_PARENT_LEDGER_OUT}" "parent bonus ledger"
+    BONUS_PARENT_LEDGER_HAS_REDEEM="$(python3 -c 'import json,sys; items=json.load(open(sys.argv[1])); print(str(any(item.get("operation")=="redeem_commit" for item in items)).lower())' "${BONUS_PARENT_LEDGER_OUT}")"
+    if [[ "${BONUS_PARENT_LEDGER_HAS_REDEEM}" != "true" ]]; then
+      log "ERROR parent bonus ledger: redeem_commit not found"
+      cat "${BONUS_PARENT_LEDGER_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Admin reads bonus account snapshot"
+    BONUS_ADMIN_ACCOUNT_OUT="${TMP_DIR}/bonus_admin_account.out.json"
+    BONUS_ADMIN_ACCOUNT_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/admin/bonus/accounts/${PAYMENT_PARENT_ID}" "" "${BONUS_ADMIN_ACCOUNT_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${BONUS_ADMIN_ACCOUNT_STATUS}" "${BONUS_ADMIN_ACCOUNT_OUT}" "admin bonus account snapshot"
+    BONUS_ADMIN_ACCOUNT_BALANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("balance",-1))' "${BONUS_ADMIN_ACCOUNT_OUT}")"
+    if [[ "${BONUS_ADMIN_ACCOUNT_BALANCE}" != "0" ]]; then
+      log "ERROR admin bonus account snapshot after approve: expected 0, got ${BONUS_ADMIN_ACCOUNT_BALANCE}"
+      cat "${BONUS_ADMIN_ACCOUNT_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Admin reads filtered bonus ledger"
+    BONUS_ADMIN_LEDGER_OUT="${TMP_DIR}/bonus_admin_ledger.out.json"
+    BONUS_ADMIN_LEDGER_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/admin/bonus/accounts/${PAYMENT_PARENT_ID}/ledger?reason_code=payment_redeem_commit&limit=20&offset=0" "" "${BONUS_ADMIN_LEDGER_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${BONUS_ADMIN_LEDGER_STATUS}" "${BONUS_ADMIN_LEDGER_OUT}" "admin bonus ledger"
+    BONUS_ADMIN_LEDGER_HAS_REDEEM="$(python3 -c 'import json,sys; items=json.load(open(sys.argv[1])); print(str(any(item.get("operation")=="redeem_commit" for item in items)).lower())' "${BONUS_ADMIN_LEDGER_OUT}")"
+    if [[ "${BONUS_ADMIN_LEDGER_HAS_REDEEM}" != "true" ]]; then
+      log "ERROR admin bonus ledger: redeem_commit not found"
+      cat "${BONUS_ADMIN_LEDGER_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Admin creates and deactivates bonus rule"
+    BONUS_RULE_PAYLOAD="${TMP_DIR}/bonus_rule.create.json"
+    cat > "${BONUS_RULE_PAYLOAD}" <<JSON
+{
+  "trigger_type": "course_completed",
+  "threshold": 1,
+  "points": 25
+}
+JSON
+    BONUS_RULE_CREATE_OUT="${TMP_DIR}/bonus_rule.create.out.json"
+    BONUS_RULE_CREATE_STATUS="$(request_json "POST" "${BONUS_BASE_URL}/v1/admin/bonus/rules" "${BONUS_RULE_PAYLOAD}" "${BONUS_RULE_CREATE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
+    assert_2xx "${BONUS_RULE_CREATE_STATUS}" "${BONUS_RULE_CREATE_OUT}" "create bonus rule"
+    BONUS_RULE_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("rule_id",""))' "${BONUS_RULE_CREATE_OUT}")"
+    if [[ -z "${BONUS_RULE_ID}" ]]; then
+      log "ERROR create bonus rule: rule_id is empty"
+      cat "${BONUS_RULE_CREATE_OUT}"
+      echo
+      exit 1
+    fi
+
+    BONUS_RULES_OUT="${TMP_DIR}/bonus_rules.out.json"
+    BONUS_RULES_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/admin/bonus/rules?active_only=true" "" "${BONUS_RULES_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${BONUS_RULES_STATUS}" "${BONUS_RULES_OUT}" "list bonus rules"
+    BONUS_RULES_HAS_CREATED="$(python3 -c 'import json,sys; items=json.load(open(sys.argv[1])); rule_id=sys.argv[2]; print(str(any(item.get("rule_id")==rule_id and item.get("is_active") is True for item in items)).lower())' "${BONUS_RULES_OUT}" "${BONUS_RULE_ID}")"
+    if [[ "${BONUS_RULES_HAS_CREATED}" != "true" ]]; then
+      log "ERROR list bonus rules: created rule not found"
+      cat "${BONUS_RULES_OUT}"
+      echo
+      exit 1
+    fi
+
+    BONUS_RULE_DEACTIVATE_OUT="${TMP_DIR}/bonus_rule.deactivate.out.json"
+    BONUS_RULE_DEACTIVATE_STATUS="$(request_json "POST" "${BONUS_BASE_URL}/v1/admin/bonus/rules/${BONUS_RULE_ID}/deactivate" "" "${BONUS_RULE_DEACTIVATE_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${BONUS_RULE_DEACTIVATE_STATUS}" "${BONUS_RULE_DEACTIVATE_OUT}" "deactivate bonus rule"
+    BONUS_RULE_DEACTIVATED="$(python3 -c 'import json,sys; print(str(json.load(open(sys.argv[1])).get("is_active",True)).lower())' "${BONUS_RULE_DEACTIVATE_OUT}")"
+    if [[ "${BONUS_RULE_DEACTIVATED}" != "false" ]]; then
+      log "ERROR deactivate bonus rule: expected is_active=false"
+      cat "${BONUS_RULE_DEACTIVATE_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Admin reads bonus summary report"
+    BONUS_SUMMARY_OUT="${TMP_DIR}/bonus_summary.out.json"
+    BONUS_SUMMARY_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/admin/bonus/reports/summary" "" "${BONUS_SUMMARY_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${BONUS_SUMMARY_STATUS}" "${BONUS_SUMMARY_OUT}" "bonus summary report"
+
+    log "Admin reads bonus reason breakdown"
+    BONUS_BREAKDOWN_OUT="${TMP_DIR}/bonus_breakdown.out.json"
+    BONUS_BREAKDOWN_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/admin/bonus/reports/by-reason?limit=50&offset=0" "" "${BONUS_BREAKDOWN_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+    assert_2xx "${BONUS_BREAKDOWN_STATUS}" "${BONUS_BREAKDOWN_OUT}" "bonus reason breakdown"
+    BONUS_BREAKDOWN_HAS_SMOKE_REWARD="$(python3 -c 'import json,sys; items=json.load(open(sys.argv[1])); print(str(any(item.get("reason_code")=="smoke_reward" for item in items)).lower())' "${BONUS_BREAKDOWN_OUT}")"
+    if [[ "${BONUS_BREAKDOWN_HAS_SMOKE_REWARD}" != "true" ]]; then
+      log "ERROR bonus reason breakdown: smoke_reward not found"
+      cat "${BONUS_BREAKDOWN_OUT}"
+      echo
+      exit 1
+    fi
+
+    log "Admin exports bonus ledger csv"
+    BONUS_LEDGER_CSV_OUT="${TMP_DIR}/bonus_ledger.csv"
+    curl -sS -H "Authorization: Bearer ${ACCESS_TOKEN}" "${BONUS_BASE_URL}/v1/admin/bonus/reports/ledger.csv?parent_id=${PAYMENT_PARENT_ID}" > "${BONUS_LEDGER_CSV_OUT}"
+    if ! grep -q "smoke_reward" "${BONUS_LEDGER_CSV_OUT}"; then
+      log "ERROR bonus ledger csv: smoke_reward row missing"
+      cat "${BONUS_LEDGER_CSV_OUT}"
+      echo
+      exit 1
+    fi
   fi
 
   if [[ "${SMOKE_ATTRIBUTION_ENABLED}" == "1" ]]; then
@@ -658,6 +775,30 @@ JSON
       if [[ "${BONUS_BALANCE_AFTER_LEARNING}" != "${SMOKE_BONUS_COURSE_COMPLETION_POINTS}" ]]; then
         log "ERROR bonus balance after course completion: expected ${SMOKE_BONUS_COURSE_COMPLETION_POINTS}, got ${BONUS_BALANCE_AFTER_LEARNING}"
         cat "${BONUS_BALANCE_AFTER_LEARNING_OUT}"
+        echo
+        exit 1
+      fi
+
+      log "Parent reads bonus balance after course completion"
+      BONUS_PARENT_BALANCE_AFTER_LEARNING_OUT="${TMP_DIR}/bonus_parent_balance.after_learning.out.json"
+      BONUS_PARENT_BALANCE_AFTER_LEARNING_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/parent/bonus/balance" "" "${BONUS_PARENT_BALANCE_AFTER_LEARNING_OUT}" -H "Authorization: Bearer ${PARENT_ACCESS_TOKEN}")"
+      assert_2xx "${BONUS_PARENT_BALANCE_AFTER_LEARNING_STATUS}" "${BONUS_PARENT_BALANCE_AFTER_LEARNING_OUT}" "parent bonus balance after learning"
+      BONUS_PARENT_BALANCE_AFTER_LEARNING="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("balance",-1))' "${BONUS_PARENT_BALANCE_AFTER_LEARNING_OUT}")"
+      if [[ "${BONUS_PARENT_BALANCE_AFTER_LEARNING}" != "${SMOKE_BONUS_COURSE_COMPLETION_POINTS}" ]]; then
+        log "ERROR parent bonus balance after course completion: expected ${SMOKE_BONUS_COURSE_COMPLETION_POINTS}, got ${BONUS_PARENT_BALANCE_AFTER_LEARNING}"
+        cat "${BONUS_PARENT_BALANCE_AFTER_LEARNING_OUT}"
+        echo
+        exit 1
+      fi
+
+      log "Admin reads bonus account after course completion"
+      BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_OUT="${TMP_DIR}/bonus_admin_account.after_learning.out.json"
+      BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_STATUS="$(request_json "GET" "${BONUS_BASE_URL}/v1/admin/bonus/accounts/${PAYMENT_PARENT_ID}" "" "${BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}")"
+      assert_2xx "${BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_STATUS}" "${BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_OUT}" "admin bonus account after learning"
+      BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_BALANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("balance",-1))' "${BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_OUT}")"
+      if [[ "${BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_BALANCE}" != "${SMOKE_BONUS_COURSE_COMPLETION_POINTS}" ]]; then
+        log "ERROR admin bonus account after course completion: expected ${SMOKE_BONUS_COURSE_COMPLETION_POINTS}, got ${BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_BALANCE}"
+        cat "${BONUS_ADMIN_ACCOUNT_AFTER_LEARNING_OUT}"
         echo
         exit 1
       fi

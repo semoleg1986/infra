@@ -77,13 +77,13 @@ ops-check:
 	./scripts/ops_baseline_check.sh
 
 dispatch-outbox:
-	LIMIT="$(LIMIT)" SERVICE=all ./scripts/dispatch_outbox.sh
+	LIMIT="$(LIMIT)" SERVICE=all bash ./scripts/dispatch_outbox.sh
 
 dispatch-payments-outbox:
-	LIMIT="$(LIMIT)" SERVICE=payments_service ./scripts/dispatch_outbox.sh
+	LIMIT="$(LIMIT)" SERVICE=payments_service bash ./scripts/dispatch_outbox.sh
 
 dispatch-course-outbox:
-	LIMIT="$(LIMIT)" SERVICE=course_service ./scripts/dispatch_outbox.sh
+	LIMIT="$(LIMIT)" SERVICE=course_service bash ./scripts/dispatch_outbox.sh
 
 load-auth-burst:
 	./scripts/load_auth_burst.sh

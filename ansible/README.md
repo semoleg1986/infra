@@ -159,6 +159,8 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
    make backup-postgres
    ```
    По умолчанию dump-файлы создаются в `~/backups/postgres/<timestamp>`.
+   Для cron/production используется явный путь `ops_cron_backup_root`
+   (по умолчанию `/home/deploy/backups/postgres`).
 
 2. Выполнить restore-drill в отдельные БД с суффиксом `_drill`:
    ```bash
@@ -172,9 +174,7 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
 
 4. (Опционально) удалить drill-базы после проверки:
    ```bash
-   for db in auth_service_prod_drill users_service_prod_drill course_service_prod_drill attribution_service_prod_drill live_class_service_prod_drill payments_service_prod_drill bonus_wallet_service_prod_drill; do
-     sudo docker exec curs_postgres psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS \"$db\";"
-  done
+   make restore-cleanup
   ```
 
 5. Ротация старых бэкапов:
@@ -204,13 +204,16 @@ crontab -e
   - daily backup (`make backup-postgres`)
   - daily rotate (`make backup-rotate`)
   - weekly restore drill (`make restore-drill`)
-  - weekly cleanup `*_drill` баз
+  - weekly cleanup `*_drill` баз (`make restore-cleanup`)
   - weekly `docker image prune -a -f`
   - periodic outbox drain (`make dispatch-outbox`)
 - Outbox automation defaults:
   - расписание: `ops_cron_outbox_dispatch_time="*/5 * * * *"`
   - лимит: `ops_cron_outbox_dispatch_limit="100"`
   - lock: `/var/lock/curs-outbox.lock`
+- Backup automation defaults:
+  - корень бэкапов: `ops_cron_backup_root="/home/deploy/backups/postgres"`
+  - restore выбирает последний timestamp именно из этого каталога
 
 ## Ops Baseline Check
 - Скрипт: `scripts/ops_baseline_check.sh`

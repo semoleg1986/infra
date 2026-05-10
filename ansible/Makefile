@@ -8,7 +8,7 @@ VARS := -e @group_vars/all.yml -e @group_vars/$(ENV).yml -e @group_vars/vault.ym
 ASK_FLAGS ?= --ask-vault-pass -K
 COMMON := ANSIBLE_ROLES_PATH=./roles ansible-playbook -i $(INVENTORY) -c local $(VARS) $(ASK_FLAGS)
 
-.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill ops-check dispatch-outbox dispatch-payments-outbox dispatch-course-outbox load-auth-burst load-live-room-burst load-payment-access-progress chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
+.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill restore-cleanup ops-check dispatch-outbox dispatch-payments-outbox dispatch-course-outbox load-auth-burst load-live-room-burst load-payment-access-progress chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
 
 help:
 	@echo "make deploy                          # full deploy for ENV=$(ENV)"
@@ -20,6 +20,7 @@ help:
 	@echo "make backup-postgres                 # create dumps in ~/backups/postgres/<timestamp>"
 	@echo "make backup-rotate                   # rotate backup dirs by age/count"
 	@echo "make restore-drill BACKUP_DIR=...    # restore dumps into *_drill DBs"
+	@echo "make restore-cleanup                 # drop *_drill DBs one by one"
 	@echo "make ops-check                       # disk/health/5xx baseline check"
 	@echo "make dispatch-outbox                 # drain payments+course outbox inside containers"
 	@echo "make dispatch-payments-outbox        # drain only payments_service outbox"
@@ -72,6 +73,9 @@ backup-rotate:
 restore-drill:
 	@test -n "$(BACKUP_DIR)" || (echo "BACKUP_DIR is required, e.g. make restore-drill BACKUP_DIR=~/backups/postgres/20260419_120000" && exit 1)
 	BACKUP_DIR="$(BACKUP_DIR)" ./scripts/pg_restore_drill.sh
+
+restore-cleanup:
+	./scripts/pg_restore_cleanup.sh
 
 ops-check:
 	./scripts/ops_baseline_check.sh

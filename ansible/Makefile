@@ -75,7 +75,7 @@ restore-drill:
 	BACKUP_DIR="$(BACKUP_DIR)" ./scripts/pg_restore_drill.sh
 
 restore-cleanup:
-	./scripts/pg_restore_cleanup.sh
+	bash ./scripts/pg_restore_cleanup.sh
 
 ops-check:
 	./scripts/ops_baseline_check.sh

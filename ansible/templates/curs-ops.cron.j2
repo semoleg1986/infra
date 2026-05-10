@@ -5,6 +5,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 {{ ops_cron_backup_time }} root flock -n /var/lock/curs-backup.lock -c "cd {{ ops_cron_ansible_dir }} && BACKUP_ROOT={{ ops_cron_backup_root }} make backup-postgres >> {{ ops_cron_log_file }} 2>&1"
 {{ ops_cron_rotate_time }} root flock -n /var/lock/curs-rotate.lock -c "cd {{ ops_cron_ansible_dir }} && BACKUP_ROOT={{ ops_cron_backup_root }} make backup-rotate >> {{ ops_cron_log_file }} 2>&1"
 {{ ops_cron_restore_time }} root flock -n /var/lock/curs-restore.lock -c "cd {{ ops_cron_ansible_dir }} && BACKUP_DIR=\$(ls -1dt {{ ops_cron_backup_root }}/* | head -1) && make restore-drill BACKUP_DIR=\$BACKUP_DIR >> {{ ops_cron_log_file }} 2>&1"
-{{ ops_cron_restore_cleanup_time }} root flock -n /var/lock/curs-restore-cleanup.lock -c "cd {{ ops_cron_ansible_dir }} && ./scripts/pg_restore_cleanup.sh >> {{ ops_cron_log_file }} 2>&1"
+{{ ops_cron_restore_cleanup_time }} root flock -n /var/lock/curs-restore-cleanup.lock -c "cd {{ ops_cron_ansible_dir }} && bash ./scripts/pg_restore_cleanup.sh >> {{ ops_cron_log_file }} 2>&1"
 {{ ops_cron_image_prune_time }} root docker image prune -a -f >> {{ ops_cron_log_file }} 2>&1
 {{ ops_cron_outbox_dispatch_time }} root flock -n /var/lock/curs-outbox.lock -c "cd {{ ops_cron_ansible_dir }} && LIMIT={{ ops_cron_outbox_dispatch_limit }} make dispatch-outbox >> {{ ops_cron_log_file }} 2>&1"

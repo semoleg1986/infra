@@ -391,7 +391,7 @@ services:
     tag: "{{ service_image_tags.web_app | default(service_image_tag) }}"
     container_name: curs_web_app
     env:
-      NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_PUBLIC_API_BASE_URL: "/api"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3000"
     ports:
       - "{{ web_public_bind_host }}:3000:3000"
@@ -406,7 +406,7 @@ services:
     tag: "{{ service_image_tags.admin_app | default(service_image_tag) }}"
     container_name: curs_admin_app
     env:
-      NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_PUBLIC_API_BASE_URL: "/api"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3001"
     ports:
       - "{{ web_public_bind_host }}:3001:3000"
@@ -421,7 +421,7 @@ services:
     tag: "{{ service_image_tags.studio_app | default(service_image_tag) }}"
     container_name: curs_studio_app
     env:
-      NUXT_PUBLIC_API_BASE_URL: "{{ auth_service_internal_url }}"
+      NUXT_PUBLIC_API_BASE_URL: "/api"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3002"
     ports:
       - "{{ web_public_bind_host }}:3002:3000"

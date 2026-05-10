@@ -62,6 +62,9 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/status.yml
   make backup-rotate
   make restore-drill BACKUP_DIR=~/backups/postgres/<timestamp>
   make ops-check
+  make dispatch-outbox
+  make dispatch-payments-outbox
+  make dispatch-course-outbox
   make load-auth-burst
   make load-live-room-burst
   make load-payment-access-progress
@@ -219,6 +222,24 @@ crontab -e
 - Полезные overrides:
   ```bash
   DISK_WARN_PCT=85 DISK_CRIT_PCT=92 LOG_5XX_WARN_COUNT=3 make ops-check
+  ```
+
+## Outbox Dispatch Ops
+- Ручной drain outbox для бонусного/платежного контура:
+  ```bash
+  make dispatch-outbox
+  ```
+- Только `payments_service`:
+  ```bash
+  make dispatch-payments-outbox
+  ```
+- Только `course_service`:
+  ```bash
+  make dispatch-course-outbox
+  ```
+- Лимит можно переопределить:
+  ```bash
+  LIMIT=200 make dispatch-outbox
   ```
 
 ## Load Baseline (Sprint 6 - 3.2)

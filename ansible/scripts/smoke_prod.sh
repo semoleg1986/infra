@@ -27,6 +27,7 @@ SESSION_FINGERPRINT="${SESSION_FINGERPRINT:-prod-smoke-$(date +%s)}"
 SERVICE_TOKEN="${SERVICE_TOKEN:-sometokencourse}"
 ATTR_SERVICE_TOKEN="${ATTR_SERVICE_TOKEN:-${SERVICE_TOKEN}}"
 BONUS_SERVICE_TOKEN="${BONUS_SERVICE_TOKEN:-${SERVICE_TOKEN}}"
+METRICS_TOKEN="${METRICS_TOKEN:-${SERVICE_TOKEN}}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -929,7 +930,7 @@ JSON
 
       log "Live metrics"
       LIVE_METRICS_OUT="${TMP_DIR}/live.metrics.out.txt"
-      curl -sS "${LIVE_BASE_URL}/metrics" > "${LIVE_METRICS_OUT}"
+      curl -sS -H "Authorization: Bearer ${METRICS_TOKEN}" "${LIVE_BASE_URL}/metrics" > "${LIVE_METRICS_OUT}"
       if ! grep -q 'live_room_participant_joins_total' "${LIVE_METRICS_OUT}"; then
         log "ERROR live metrics: join metric family missing"
         cat "${LIVE_METRICS_OUT}"

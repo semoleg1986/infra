@@ -67,6 +67,8 @@ ops_cron_rotate_time: "45 3 * * *"
 ops_cron_restore_time: "0 4 * * 0"
 ops_cron_restore_cleanup_time: "25 4 * * 0"
 ops_cron_image_prune_time: "10 5 * * 0"
+ops_cron_outbox_dispatch_time: "*/5 * * * *"
+ops_cron_outbox_dispatch_limit: "100"
 observability_assets_root: /home/deploy/apps/infra/ansible/files/observability
 grafana_admin_user: admin
 grafana_admin_password: admin

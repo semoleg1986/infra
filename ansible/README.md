@@ -206,6 +206,11 @@ crontab -e
   - weekly restore drill (`make restore-drill`)
   - weekly cleanup `*_drill` баз
   - weekly `docker image prune -a -f`
+  - periodic outbox drain (`make dispatch-outbox`)
+- Outbox automation defaults:
+  - расписание: `ops_cron_outbox_dispatch_time="*/5 * * * *"`
+  - лимит: `ops_cron_outbox_dispatch_limit="100"`
+  - lock: `/var/lock/curs-outbox.lock`
 
 ## Ops Baseline Check
 - Скрипт: `scripts/ops_baseline_check.sh`
@@ -241,6 +246,8 @@ crontab -e
   ```bash
   LIMIT=200 make dispatch-outbox
   ```
+- В `prod` автоматический drain ставится через `/etc/cron.d/curs-ops`
+  и запускает `make dispatch-outbox` каждые 5 минут с `flock`.
 
 ## Load Baseline (Sprint 6 - 3.2)
 - Первый server-side сценарий:

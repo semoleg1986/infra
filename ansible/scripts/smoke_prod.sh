@@ -21,6 +21,8 @@ SMOKE_ATTRIBUTION_ENABLED="${SMOKE_ATTRIBUTION_ENABLED:-0}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-1}"
 SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-}"
 SMOKE_PAYMENTS_OFFER_ID="${SMOKE_PAYMENTS_OFFER_ID:-}"
+SMOKE_LEARNING_LESSON1_ID="${SMOKE_LEARNING_LESSON1_ID:-}"
+SMOKE_LEARNING_LESSON2_ID="${SMOKE_LEARNING_LESSON2_ID:-}"
 
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
@@ -787,9 +789,24 @@ JSON
   fi
 
   if [[ "${SMOKE_LEARNING_ENABLED}" == "1" ]]; then
+    if [[ "${PAYMENT_COURSE_ID}" == "${COURSE_ID}" ]]; then
+      TARGET_LESSON1_ID="${LESSON1_ID}"
+      TARGET_LESSON2_ID="${LESSON2_ID}"
+    else
+      TARGET_LESSON1_ID="${SMOKE_LEARNING_LESSON1_ID}"
+      TARGET_LESSON2_ID="${SMOKE_LEARNING_LESSON2_ID}"
+
+      if [[ -z "${TARGET_LESSON1_ID}" || -z "${TARGET_LESSON2_ID}" ]]; then
+        log "ERROR learning smoke for external payment course requires SMOKE_LEARNING_LESSON1_ID and SMOKE_LEARNING_LESSON2_ID"
+        log "payment_course_id=${PAYMENT_COURSE_ID}"
+        log "created_course_id=${COURSE_ID}"
+        exit 1
+      fi
+    fi
+
     log "Student complete first lesson"
     STUDENT_COMPLETE1_OUT="${TMP_DIR}/student.complete1.out.json"
-    STUDENT_COMPLETE1_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/student/courses/${PAYMENT_COURSE_ID}/lessons/${LESSON1_ID}/complete" "" "${STUDENT_COMPLETE1_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
+    STUDENT_COMPLETE1_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/student/courses/${PAYMENT_COURSE_ID}/lessons/${TARGET_LESSON1_ID}/complete" "" "${STUDENT_COMPLETE1_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
     assert_2xx "${STUDENT_COMPLETE1_STATUS}" "${STUDENT_COMPLETE1_OUT}" "student complete lesson 1"
     COURSE_STATUS_1="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["course_status"])' "${STUDENT_COMPLETE1_OUT}")"
     if [[ "${COURSE_STATUS_1}" != "in_progress" ]]; then
@@ -801,7 +818,7 @@ JSON
 
     log "Student complete second lesson"
     STUDENT_COMPLETE2_OUT="${TMP_DIR}/student.complete2.out.json"
-    STUDENT_COMPLETE2_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/student/courses/${PAYMENT_COURSE_ID}/lessons/${LESSON2_ID}/complete" "" "${STUDENT_COMPLETE2_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
+    STUDENT_COMPLETE2_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/student/courses/${PAYMENT_COURSE_ID}/lessons/${TARGET_LESSON2_ID}/complete" "" "${STUDENT_COMPLETE2_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"
     assert_2xx "${STUDENT_COMPLETE2_STATUS}" "${STUDENT_COMPLETE2_OUT}" "student complete lesson 2"
     COURSE_STATUS_2="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["course_status"])' "${STUDENT_COMPLETE2_OUT}")"
     if [[ "${COURSE_STATUS_2}" != "completed" ]]; then
@@ -891,7 +908,7 @@ JSON
       cat > "${LIVE_ROOM_PAYLOAD}" <<JSON
 {
   "courseId": "${PAYMENT_COURSE_ID}",
-  "lessonId": "${LESSON1_ID}",
+  "lessonId": "${TARGET_LESSON1_ID}",
   "participantsLimit": 5
 }
 JSON

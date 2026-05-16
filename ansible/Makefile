@@ -101,6 +101,9 @@ load-auth-throttle-guard:
 load-live-room-burst:
 	./scripts/load_live_room_burst.sh
 
+load-live-room-throttle-guard:
+	./scripts/load_live_room_throttle_guard.sh
+
 load-payment-access-progress:
 	./scripts/load_payment_access_progress.sh
 

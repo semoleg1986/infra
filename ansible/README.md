@@ -305,11 +305,18 @@ crontab -e
 
 - Второй server-side сценарий:
   - `scripts/load/scenarios/live-room-burst.k6.js`
+  - `scripts/load/scenarios/live-room-throttle-guard.k6.js`
 - Обертка запуска:
   - `scripts/load_live_room_burst.sh`
 - Команда:
   ```bash
   make load-live-room-burst
+
+Live throttle guard:
+
+```bash
+K6_LIVE_OFFER_ID=<offer-id> K6_LIVE_LESSON_ID=<lesson-id> K6_VUS=20 K6_DURATION=2m K6_USER_POOL_SIZE=20 K6_ROOM_POOL_SIZE=20 K6_SETUP_TIMEOUT=20m make load-live-room-throttle-guard
+```
   ```
 - По умолчанию сценарий:
   - логинится admin-пользователем

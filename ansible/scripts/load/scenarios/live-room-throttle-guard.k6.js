@@ -1,4 +1,3 @@
-import exec from 'k6/execution';
 import { sleep } from 'k6';
 import { Counter, Rate, Trend } from 'k6/metrics';
 import { authMe, login, register } from '../shared/http.js';
@@ -20,41 +19,30 @@ const parentPassword = __ENV.PARENT_PASSWORD || 'parent12345';
 const offerId = __ENV.LOAD_LIVE_OFFER_ID || __ENV.K6_LIVE_OFFER_ID || __ENV.LOAD_PAYMENT_OFFER_ID || __ENV.K6_PAYMENT_OFFER_ID || '';
 const forcedCourseId = __ENV.LOAD_LIVE_COURSE_ID || __ENV.K6_LIVE_COURSE_ID || '';
 const lessonId = __ENV.LOAD_LIVE_LESSON_ID || __ENV.K6_LIVE_LESSON_ID || '';
-const vus = Number(__ENV.LOAD_VUS || __ENV.K6_VUS || 10);
-const maxDuration = __ENV.LOAD_DURATION || __ENV.K6_DURATION || '2m';
+const vus = Number(__ENV.LOAD_VUS || __ENV.K6_VUS || 20);
+const duration = __ENV.LOAD_DURATION || __ENV.K6_DURATION || '2m';
 const thinkTimeSeconds = Number(__ENV.LOAD_THINK_TIME_SECONDS || __ENV.K6_THINK_TIME_SECONDS || 0.2);
 const setupTimeout = __ENV.LOAD_SETUP_TIMEOUT || __ENV.K6_SETUP_TIMEOUT || '20m';
 const studentPoolSize = Number(__ENV.LOAD_USER_POOL_SIZE || __ENV.K6_USER_POOL_SIZE || Math.max(vus, 10));
 const roomPoolSize = Number(__ENV.LOAD_ROOM_POOL_SIZE || __ENV.K6_ROOM_POOL_SIZE || Math.max(vus, 1));
-const scenarioPoolSize = Math.max(vus, studentPoolSize, roomPoolSize);
 
 const joinDuration = new Trend('live_join_duration_ms');
-const leaveDuration = new Trend('live_leave_duration_ms');
 const attendanceDuration = new Trend('live_attendance_duration_ms');
-const successRate = new Rate('live_flow_success_rate');
-const joinFailures = new Counter('live_join_failures_total');
-const leaveFailures = new Counter('live_leave_failures_total');
-const attendanceFailures = new Counter('live_attendance_failures_total');
-const join403s = new Counter('live_join_status_403_total');
-const join409s = new Counter('live_join_status_409_total');
-const joinOtherErrors = new Counter('live_join_status_other_total');
+const join2xxRate = new Rate('live_join_2xx_rate');
+const join429Rate = new Rate('live_join_429_rate');
+const join5xxTotal = new Counter('live_join_status_5xx_total');
+const attendance2xxRate = new Rate('live_attendance_2xx_rate');
+const attendance429Rate = new Rate('live_attendance_429_rate');
+const attendance5xxTotal = new Counter('live_attendance_status_5xx_total');
 
 export const options = {
-  scenarios: {
-    default: {
-      executor: 'shared-iterations',
-      vus: Math.min(vus, scenarioPoolSize),
-      iterations: scenarioPoolSize,
-      maxDuration,
-    },
-  },
+  vus,
+  duration,
   setupTimeout,
   thresholds: {
-    http_req_failed: ['rate<0.01'],
-    live_flow_success_rate: ['rate>0.99'],
-    live_join_duration_ms: ['p(95)<750'],
-    live_leave_duration_ms: ['p(95)<500'],
-    live_attendance_duration_ms: ['p(95)<500'],
+    live_join_429_rate: ['rate>0'],
+    live_join_status_5xx_total: ['count==0'],
+    live_attendance_status_5xx_total: ['count==0'],
   },
 };
 
@@ -62,7 +50,7 @@ function buildStudentScenario(index, adminToken, parentToken, parentId, courseId
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${index}`;
   const email = `student.live.${suffix}@example.com`;
   register({ authBaseUrl, email, password: studentPassword, defaultRole: 'student' });
-  const studentToken = login({ authBaseUrl, email, password: studentPassword, fingerprint: `k6-live-student-${suffix}`, clientName: 'k6-live-load-baseline' });
+  const studentToken = login({ authBaseUrl, email, password: studentPassword, fingerprint: `k6-live-student-${suffix}`, clientName: 'k6-live-throttle-guard' });
   const studentMe = authMe({ authBaseUrl, accessToken: studentToken });
   const studentUserId = studentMe.user_id;
   createAdminUser({
@@ -105,14 +93,14 @@ export function setup() {
     throw new Error('K6_LIVE_LESSON_ID is required');
   }
 
-  const adminToken = login({ authBaseUrl, email: adminEmail, password: adminPassword, fingerprint: `k6-live-admin-${Date.now()}`, clientName: 'k6-live-load-baseline' });
+  const adminToken = login({ authBaseUrl, email: adminEmail, password: adminPassword, fingerprint: `k6-live-admin-${Date.now()}`, clientName: 'k6-live-throttle-guard' });
   const snapshot = resolveOfferSnapshot({ commercialCatalogBaseUrl, serviceToken, offerId });
   const courseId = forcedCourseId || snapshot.courseId;
 
   const parentSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const parentEmail = `parent.live.${parentSuffix}@example.com`;
   register({ authBaseUrl, email: parentEmail, password: parentPassword, defaultRole: 'parent' });
-  const parentToken = login({ authBaseUrl, email: parentEmail, password: parentPassword, fingerprint: `k6-live-parent-${parentSuffix}`, clientName: 'k6-live-load-baseline' });
+  const parentToken = login({ authBaseUrl, email: parentEmail, password: parentPassword, fingerprint: `k6-live-parent-${parentSuffix}`, clientName: 'k6-live-throttle-guard' });
   const parentMe = authMe({ authBaseUrl, accessToken: parentToken });
   const parentUserId = parentMe.account_id;
   createAdminUser({
@@ -145,54 +133,30 @@ export default function (data) {
     throw new Error('setup did not provide rooms');
   }
 
-  const iterationInTest =
-    exec.scenario && typeof exec.scenario.iterationInTest === 'number'
-      ? exec.scenario.iterationInTest
-      : __ITER;
-  const scenarioIndex = iterationInTest % scenarioPoolSize;
-  const student = students[scenarioIndex % students.length];
-  const roomId = rooms[scenarioIndex % rooms.length];
+  const student = students[(__VU - 1) % students.length];
+  const roomId = rooms[(__VU - 1) % rooms.length];
   const roomState = getRoomVersion({ liveBaseUrl, accessToken: student.accessToken, roomId });
   const expectedVersion = roomState.version;
 
   const joined = joinRoom({ liveBaseUrl, studentToken: student.accessToken, roomId, expectedVersion });
   joinDuration.add(joined.response.timings.duration);
-  if (!joined.ok) {
-    joinFailures.add(1);
-    if (joined.response.status === 403) {
-      join403s.add(1);
-    } else if (joined.response.status === 409) {
-      join409s.add(1);
-    } else {
-      joinOtherErrors.add(1);
-    }
-    successRate.add(false);
-    sleep(thinkTimeSeconds);
-    return;
-  }
-  if (typeof joined.version !== 'number') {
-    joinFailures.add(1);
-    joinOtherErrors.add(1);
-    successRate.add(false);
-    sleep(thinkTimeSeconds);
-    return;
+  join2xxRate.add(joined.response.status === 201);
+  join429Rate.add(joined.response.status === 429);
+  if (joined.response.status >= 500) {
+    join5xxTotal.add(1);
   }
 
-  const left = leaveRoom({ liveBaseUrl, studentToken: student.accessToken, roomId, expectedVersion: joined.version });
-  leaveDuration.add(left.response.timings.duration);
-  if (!left.ok) {
-    leaveFailures.add(1);
-    successRate.add(false);
-    sleep(thinkTimeSeconds);
-    return;
+  if (joined.response.status === 201 && typeof joined.version === 'number') {
+    leaveRoom({ liveBaseUrl, studentToken: student.accessToken, roomId, expectedVersion: joined.version });
   }
 
   const attendance = readAttendance({ liveBaseUrl, adminToken: data.adminToken, roomId });
   attendanceDuration.add(attendance.response.timings.duration);
-  if (!attendance.ok) {
-    attendanceFailures.add(1);
+  attendance2xxRate.add(attendance.response.status === 200);
+  attendance429Rate.add(attendance.response.status === 429);
+  if (attendance.response.status >= 500) {
+    attendance5xxTotal.add(1);
   }
 
-  successRate.add(joined.ok && left.ok && attendance.ok);
   sleep(thinkTimeSeconds);
 }

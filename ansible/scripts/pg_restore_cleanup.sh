@@ -5,7 +5,7 @@ POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-curs_postgres}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
 RESTORE_SUFFIX="${RESTORE_SUFFIX:-_drill}"
-DBS="${DBS:-auth_service_prod,users_service_prod,course_service_prod,attribution_service_prod,live_class_service_prod,payments_service_prod,bonus_wallet_service_prod}"
+DBS="${DBS:-auth_service_prod,users_service_prod,course_service_prod,commercial_catalog_service_prod,attribution_service_prod,live_class_service_prod,payments_service_prod,bonus_wallet_service_prod}"
 
 echo "[restore-cleanup] container=${POSTGRES_CONTAINER}"
 echo "[restore-cleanup] suffix=${RESTORE_SUFFIX}"

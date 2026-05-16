@@ -137,13 +137,12 @@ export function setup() {
   const offer = resolveOfferSnapshot({ commercialCatalogBaseUrl, serviceToken, offerId: paymentOfferId });
   const scenarios = [];
   for (let i = 0; i < scenarioPoolSize; i += 1) {
-    scenarios.push({
-      ...buildScenario(i + 1, adminToken),
-      offerId: paymentOfferId,
-      courseId: offer.courseId,
-      lesson1Id: learningLesson1Id,
-      lesson2Id: learningLesson2Id,
-    });
+    const scenario = buildScenario(i + 1, adminToken);
+    scenario.offerId = paymentOfferId;
+    scenario.courseId = offer.courseId;
+    scenario.lesson1Id = learningLesson1Id;
+    scenario.lesson2Id = learningLesson2Id;
+    scenarios.push(scenario);
   }
   return { adminToken, scenarios };
 }

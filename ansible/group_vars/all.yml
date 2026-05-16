@@ -26,6 +26,7 @@ postgres_databases:
   - "live_class_service{{ db_suffix }}"
   - "payments_service{{ db_suffix }}"
   - "bonus_wallet_service{{ db_suffix }}"
+  - "commercial_catalog_service{{ db_suffix }}"
 
 auth_service_internal_url: http://curs_auth_service:8000
 users_service_internal_url: http://curs_users_service:8002
@@ -33,12 +34,14 @@ course_service_internal_url: http://curs_course_service:8001
 attribution_service_internal_url: http://curs_attribution_service:8000
 payments_service_internal_url: http://curs_payments_service:8004
 bonus_wallet_service_internal_url: http://curs_bonus_wallet_service:8006
+commercial_catalog_service_internal_url: http://curs_commercial_catalog_service:8007
 redis_internal_url: redis://curs_redis:6379/0
 course_service_token: dev-service-token
 users_service_token: "{{ course_service_token }}"
 payments_service_token: "{{ course_service_token }}"
 attribution_service_token: "{{ course_service_token }}"
 bonus_wallet_service_token: "{{ course_service_token }}"
+commercial_catalog_service_token: "{{ course_service_token }}"
 observability_metrics_token: "{{ course_service_token }}"
 auth_jwt_private_key_pem: "{{ vault_auth_jwt_private_key_pem | default(None) }}"
 auth_jwt_public_key_pem: "{{ vault_auth_jwt_public_key_pem | default(None) }}"
@@ -384,6 +387,35 @@ services:
     healthcheck:
       path: /healthz
       port: 8006
+
+  commercial_catalog_service:
+    enabled: true
+    workdir: "{{ project_root }}/commercial_catalog_service"
+    image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/commercial_catalog_service"
+    tag: "{{ service_image_tags.commercial_catalog_service | default(service_image_tag) }}"
+    migration_db: "commercial_catalog_service{{ db_suffix }}"
+    migration_stamp_revision: "20260516_0001"
+    migration_stamp_probe_table: course_offers
+    migration_stamp_head_probe_table: course_offers
+    migration_stamp_head_revision: "20260516_0001"
+    container_name: curs_commercial_catalog_service
+    env:
+      COMMERCIAL_CATALOG_DATABASE_URL: "postgresql+psycopg://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/commercial_catalog_service{{ db_suffix }}"
+      COMMERCIAL_CATALOG_USE_INMEMORY: "0"
+      COMMERCIAL_CATALOG_AUTO_CREATE_SCHEMA: "0"
+      COMMERCIAL_CATALOG_SERVICE_TOKEN: "{{ commercial_catalog_service_token }}"
+      COMMERCIAL_CATALOG_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
+      COMMERCIAL_CATALOG_COURSE_SERVICE_TOKEN: "{{ course_service_token }}"
+      COMMERCIAL_CATALOG_COURSE_SERVICE_TIMEOUT_SECONDS: "2"
+    migration_command:
+      - alembic
+      - upgrade
+      - head
+    ports:
+      - "{{ api_public_bind_host }}:8007:8007"
+    healthcheck:
+      path: /healthz
+      port: 8007
 
   web_app:
     enabled: true

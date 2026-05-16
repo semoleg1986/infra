@@ -29,3 +29,4 @@ users_service_token: "{{ vault_users_service_token | default(course_service_toke
 payments_service_token: "{{ vault_payments_service_token | default(course_service_token) }}"
 attribution_service_token: "{{ vault_attribution_service_token | default(course_service_token) }}"
 bonus_wallet_service_token: "{{ vault_bonus_wallet_service_token | default(course_service_token) }}"
+commercial_catalog_service_token: "{{ vault_commercial_catalog_service_token | default(course_service_token) }}"

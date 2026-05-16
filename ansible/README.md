@@ -258,7 +258,7 @@ crontab -e
   - `scripts/load/scenarios/*.k6.js` - тонкие entrypoints под конкретные профили нагрузки
 
 - Первый server-side сценарий:
-  - `scripts/load/scenarios/auth-burst.k6.js`
+  - `scripts/load/scenarios/auth-success-baseline.k6.js`
 - Обертка запуска:
   - `scripts/load_auth_burst.sh`
 - Команда:
@@ -290,6 +290,18 @@ crontab -e
 - Важно:
   - если использовать один существующий аккаунт, сценарий почти наверняка упрется в `AUTH_RATE_LIMIT_LOGIN_MAX`
   - для throughput baseline лучше оставлять auto-register pool mode
+
+- Отдельный pressure-профиль для guardrails:
+  - `scripts/load/scenarios/auth-throttle-guard.k6.js`
+- Обертка запуска:
+  - `scripts/load_auth_throttle_guard.sh`
+- Команда:
+  ```bash
+  make load-auth-throttle-guard
+  ```
+- Назначение:
+  - намеренно давить login path и наблюдать, что throttling дает `429`
+  - не использовать как success baseline latency/correctness
 
 - Второй server-side сценарий:
   - `scripts/load/scenarios/live-room-burst.k6.js`

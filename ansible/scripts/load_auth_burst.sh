@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOAD_DIR="${SCRIPT_DIR}/load"
-K6_SCRIPT="${K6_SCRIPT:-${LOAD_DIR}/scenarios/auth-burst.k6.js}"
+K6_SCRIPT="${K6_SCRIPT:-${LOAD_DIR}/scenarios/auth-success-baseline.k6.js}"
 K6_SCRIPT_RELATIVE="${K6_SCRIPT#${LOAD_DIR}/}"
 K6_SCRIPT_IN_CONTAINER="/work/load/${K6_SCRIPT_RELATIVE}"
 

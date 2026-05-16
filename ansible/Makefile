@@ -8,7 +8,7 @@ VARS := -e @group_vars/all.yml -e @group_vars/$(ENV).yml -e @group_vars/vault.ym
 ASK_FLAGS ?= --ask-vault-pass -K
 COMMON := ANSIBLE_ROLES_PATH=./roles ansible-playbook -i $(INVENTORY) -c local $(VARS) $(ASK_FLAGS)
 
-.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill restore-cleanup ops-check dispatch-outbox dispatch-payments-outbox dispatch-course-outbox load-auth-burst load-live-room-burst load-payment-access-progress load-payment-bonus-checkout load-payment-throttle-guard chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
+.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill restore-cleanup ops-check dispatch-outbox dispatch-payments-outbox dispatch-course-outbox load-auth-burst load-auth-throttle-guard load-live-room-burst load-payment-access-progress load-payment-bonus-checkout load-payment-throttle-guard chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
 
 help:
 	@echo "make deploy                          # full deploy for ENV=$(ENV)"
@@ -25,7 +25,8 @@ help:
 	@echo "make dispatch-outbox                 # drain payments+course outbox inside containers"
 	@echo "make dispatch-payments-outbox        # drain only payments_service outbox"
 	@echo "make dispatch-course-outbox          # drain only course_service outbox"
-	@echo "make load-auth-burst                 # run server-side auth load baseline via Dockerized k6"
+	@echo "make load-auth-burst                 # run server-side auth success baseline via Dockerized k6"
+	@echo "make load-auth-throttle-guard        # run auth login pressure profile to observe 429 guard behavior"
 	@echo "make load-live-room-burst            # run server-side live join/leave baseline via Dockerized k6"
 	@echo "make load-payment-access-progress    # run offer-based success-baseline checkout via Dockerized k6"
 	@echo "make load-payment-bonus-checkout     # run offer-based payment+bonus checkout baseline via Dockerized k6"
@@ -93,6 +94,9 @@ dispatch-course-outbox:
 
 load-auth-burst:
 	./scripts/load_auth_burst.sh
+
+load-auth-throttle-guard:
+	./scripts/load_auth_throttle_guard.sh
 
 load-live-room-burst:
 	./scripts/load_live_room_burst.sh

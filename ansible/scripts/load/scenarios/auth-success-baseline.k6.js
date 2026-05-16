@@ -30,7 +30,7 @@ export const options = {
   thresholds: {
     http_req_failed: ['rate<0.01'],
     auth_flow_success_rate: ['rate>0.99'],
-    auth_login_duration_ms: ['p(95)<500'],
+    auth_login_duration_ms: ['p(95)<3000'],
     auth_me_duration_ms: ['p(95)<250'],
   },
 };

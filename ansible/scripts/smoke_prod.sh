@@ -11,6 +11,7 @@ LIVE_BASE_URL="${LIVE_BASE_URL:-http://127.0.0.1:8010}"
 ATTR_BASE_URL="${ATTR_BASE_URL:-http://127.0.0.1:8003}"
 PAYMENTS_BASE_URL="${PAYMENTS_BASE_URL:-http://127.0.0.1:8004}"
 BONUS_BASE_URL="${BONUS_BASE_URL:-http://127.0.0.1:8006}"
+COMMERCIAL_CATALOG_BASE_URL="${COMMERCIAL_CATALOG_BASE_URL:-http://127.0.0.1:8007}"
 SMOKE_PAYMENTS_ENABLED="${SMOKE_PAYMENTS_ENABLED:-0}"
 SMOKE_BONUS_ENABLED="${SMOKE_BONUS_ENABLED:-0}"
 SMOKE_BONUS_COURSE_COMPLETION_POINTS="${SMOKE_BONUS_COURSE_COMPLETION_POINTS:-25}"
@@ -19,6 +20,7 @@ SMOKE_LIVE_ENABLED="${SMOKE_LIVE_ENABLED:-0}"
 SMOKE_ATTRIBUTION_ENABLED="${SMOKE_ATTRIBUTION_ENABLED:-0}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-1}"
 SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-}"
+SMOKE_PAYMENTS_OFFER_ID="${SMOKE_PAYMENTS_OFFER_ID:-}"
 
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
@@ -106,6 +108,12 @@ if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
   code="$(curl -sS -o /dev/null -w '%{http_code}' "${PAYMENTS_BASE_URL}/healthz")"
   if [[ "${code}" != "200" ]]; then
     log "ERROR health check failed for ${PAYMENTS_BASE_URL}/healthz: HTTP ${code}"
+    exit 1
+  fi
+
+  code="$(curl -sS -o /dev/null -w '%{http_code}' "${COMMERCIAL_CATALOG_BASE_URL}/healthz")"
+  if [[ "${code}" != "200" ]]; then
+    log "ERROR health check failed for ${COMMERCIAL_CATALOG_BASE_URL}/healthz: HTTP ${code}"
     exit 1
   fi
 fi
@@ -274,6 +282,7 @@ assert_2xx "${COURSE_PUBLISH_STATUS}" "${COURSE_PUBLISH_OUT}" "publish course"
 PAYMENT_STUDENT_ID="${SMOKE_PAYMENTS_STUDENT_ID:-student-smoke-${SMOKE_ID}}"
 PAYMENT_PARENT_ID="${SMOKE_PAYMENTS_PARENT_ID:-parent-smoke-${SMOKE_ID}}"
 PAYMENT_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-${COURSE_ID}}"
+PAYMENT_OFFER_ID="${SMOKE_PAYMENTS_OFFER_ID:-}"
 STUDENT_EMAIL="student.smoke.${SMOKE_ID}@example.com"
 STUDENT_PASSWORD="${SMOKE_STUDENT_PASSWORD:-student12345}"
 PARENT_EMAIL="parent.smoke.${SMOKE_ID}@example.com"
@@ -388,6 +397,33 @@ JSON
     assert_2xx "${LINK_STATUS}" "${LINK_OUT}" "create parent-student link"
   fi
 
+  if [[ -z "${PAYMENT_OFFER_ID}" ]]; then
+    log "ERROR payments smoke requires SMOKE_PAYMENTS_OFFER_ID"
+    exit 1
+  fi
+
+  log "Resolve offer snapshot in commercial_catalog_service"
+  OFFER_OUT="${TMP_DIR}/offer.out.json"
+  OFFER_STATUS="$(request_json "GET" "${COMMERCIAL_CATALOG_BASE_URL}/internal/v1/offers/${PAYMENT_OFFER_ID}" "" "${OFFER_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
+  assert_2xx "${OFFER_STATUS}" "${OFFER_OUT}" "resolve offer snapshot"
+
+  OFFER_COURSE_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("course_id",""))' "${OFFER_OUT}")"
+  if [[ -z "${OFFER_COURSE_ID}" ]]; then
+    log "ERROR resolve offer snapshot: course_id is empty"
+    cat "${OFFER_OUT}"
+    echo
+    exit 1
+  fi
+
+  if [[ -n "${SMOKE_PAYMENTS_COURSE_ID}" && "${PAYMENT_COURSE_ID}" != "${OFFER_COURSE_ID}" ]]; then
+    log "ERROR offer snapshot course_id mismatch: expected ${PAYMENT_COURSE_ID}, got ${OFFER_COURSE_ID}"
+    cat "${OFFER_OUT}"
+    echo
+    exit 1
+  fi
+
+  PAYMENT_COURSE_ID="${OFFER_COURSE_ID}"
+
   BONUS_REQUESTED_AMOUNT=0
   if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
     BONUS_REQUESTED_AMOUNT=30
@@ -413,7 +449,7 @@ JSON
 {
   "parent_id": "${PAYMENT_PARENT_ID}",
   "student_id": "${PAYMENT_STUDENT_ID}",
-  "course_id": "${PAYMENT_COURSE_ID}",
+  "offer_id": "${PAYMENT_OFFER_ID}",
   "bonus_amount": ${BONUS_REQUESTED_AMOUNT},
   "idempotency_key": "smoke-pay-${SMOKE_ID}-${RANDOM}"
 }

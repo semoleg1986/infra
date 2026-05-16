@@ -3,9 +3,9 @@ import { Counter, Rate, Trend } from 'k6/metrics';
 import { createPaymentIntent } from '../shared/payments.js';
 import { setup as successSetup, options as successOptions } from './payment-access-progress.k6.js';
 
-const vus = Number(__ENV.K6_VUS || 5);
-const duration = __ENV.K6_DURATION || '2m';
-const thinkTimeSeconds = Number(__ENV.K6_THINK_TIME_SECONDS || 0.2);
+const vus = Number(__ENV.LOAD_VUS || __ENV.K6_VUS || 5);
+const duration = __ENV.LOAD_DURATION || __ENV.K6_DURATION || '2m';
+const thinkTimeSeconds = Number(__ENV.LOAD_THINK_TIME_SECONDS || __ENV.K6_THINK_TIME_SECONDS || 0.2);
 const paymentCreateDuration = new Trend('payment_create_duration_ms');
 const paymentCreate429Rate = new Rate('payment_create_429_rate');
 const paymentCreate2xxRate = new Rate('payment_create_2xx_rate');
@@ -39,7 +39,9 @@ export default function (data) {
     parentId: scenario.parentId,
     studentId: scenario.studentId,
     offerId: scenario.offerId,
-    bonusAmount: (__ENV.K6_BONUS_ENABLED || '0') === '1' ? Number(__ENV.K6_BONUS_AMOUNT || 30) : 0,
+    bonusAmount: (__ENV.LOAD_BONUS_ENABLED || __ENV.K6_BONUS_ENABLED || '0') === '1'
+      ? Number(__ENV.LOAD_BONUS_AMOUNT || __ENV.K6_BONUS_AMOUNT || 30)
+      : 0,
     idempotencyKey: `k6-throttle-${scenario.suffix}-${__VU}-${__ITER}`,
   });
   paymentCreateDuration.add(payment.response.timings.duration);

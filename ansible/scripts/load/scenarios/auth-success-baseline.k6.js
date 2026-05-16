@@ -8,11 +8,11 @@ import {
 
 const authBaseUrl = (__ENV.AUTH_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 const registerEnabled = (__ENV.AUTH_REGISTER_ENABLED || 'true').toLowerCase() !== 'false';
-const vus = Number(__ENV.K6_VUS || 50);
-const duration = __ENV.K6_DURATION || '3m';
-const thinkTimeSeconds = Number(__ENV.K6_THINK_TIME_SECONDS || 0.2);
-const userPoolSize = Number(__ENV.K6_USER_POOL_SIZE || Math.max(vus * 50, 1000));
-const setupTimeout = __ENV.K6_SETUP_TIMEOUT || '15m';
+const vus = Number(__ENV.LOAD_VUS || __ENV.K6_VUS || 50);
+const duration = __ENV.LOAD_DURATION || __ENV.K6_DURATION || '3m';
+const thinkTimeSeconds = Number(__ENV.LOAD_THINK_TIME_SECONDS || __ENV.K6_THINK_TIME_SECONDS || 0.2);
+const userPoolSize = Number(__ENV.LOAD_USER_POOL_SIZE || __ENV.K6_USER_POOL_SIZE || Math.max(vus * 50, 1000));
+const setupTimeout = __ENV.LOAD_SETUP_TIMEOUT || __ENV.K6_SETUP_TIMEOUT || '15m';
 
 const loginDuration = new Trend('auth_login_duration_ms');
 const meDuration = new Trend('auth_me_duration_ms');

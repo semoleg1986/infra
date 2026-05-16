@@ -1,7 +1,11 @@
 import http from 'k6/http';
 
 export function jsonHeaders(extra = {}) {
-  return { 'Content-Type': 'application/json', ...extra };
+  const headers = { 'Content-Type': 'application/json' };
+  Object.keys(extra).forEach((key) => {
+    headers[key] = extra[key];
+  });
+  return headers;
 }
 
 export function require2xx(response, step) {

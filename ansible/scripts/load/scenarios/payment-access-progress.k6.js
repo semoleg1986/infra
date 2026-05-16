@@ -1,5 +1,6 @@
 import { check, sleep } from 'k6';
 import http from 'k6/http';
+import exec from 'k6/execution';
 import { Counter, Rate, Trend } from 'k6/metrics';
 import { authMe, login, register } from '../shared/http.js';
 import { createAdminUser, createParentStudentLink } from '../shared/users.js';
@@ -60,8 +61,14 @@ const paymentApproveOtherErrors = new Counter('payment_approve_status_other_tota
 const paymentApproveExpectedStatuses = http.expectedStatuses({ min: 200, max: 299 }, 400);
 
 export const options = {
-  vus,
-  duration,
+  scenarios: {
+    default: {
+      executor: 'shared-iterations',
+      vus: Math.min(vus, scenarioPoolSize),
+      iterations: scenarioPoolSize,
+      maxDuration: duration,
+    },
+  },
   setupTimeout,
   thresholds: {
     http_req_failed: ['rate<0.01'],
@@ -152,7 +159,11 @@ export default function (data) {
   if (scenarios.length === 0) {
     throw new Error('setup did not provide scenarios');
   }
-  const scenario = scenarios[(__VU - 1) % scenarios.length];
+  const scenarioIndex = exec.scenario.iterationInTest;
+  const scenario = scenarios[scenarioIndex];
+  if (!scenario) {
+    throw new Error(`setup scenario missing for iteration ${scenarioIndex}`);
+  }
 
   if (bonusEnabled) {
     const accrual = accrueBonus({ bonusBaseUrl, bonusServiceToken, parentId: scenario.parentId, amount: bonusAmount, suffix: scenario.suffix, vu: __VU, iter: __ITER });

@@ -14,18 +14,22 @@ export function require2xx(response, step) {
   }
 }
 
-export function register({ authBaseUrl, email, password, defaultRole }) {
-  const response = http.post(
+export function registerResponse({ authBaseUrl, email, password, defaultRole }) {
+  return http.post(
     `${authBaseUrl}/v1/auth/register`,
     JSON.stringify({ email, password, default_role: defaultRole }),
     { headers: jsonHeaders(), tags: { endpoint: 'auth_register' } },
   );
+}
+
+export function register({ authBaseUrl, email, password, defaultRole }) {
+  const response = registerResponse({ authBaseUrl, email, password, defaultRole });
   require2xx(response, `register ${email}`);
   return response;
 }
 
-export function login({ authBaseUrl, email, password, fingerprint, clientName }) {
-  const response = http.post(
+export function loginResponse({ authBaseUrl, email, password, fingerprint, clientName }) {
+  return http.post(
     `${authBaseUrl}/v1/auth/login`,
     JSON.stringify({
       email,
@@ -36,6 +40,10 @@ export function login({ authBaseUrl, email, password, fingerprint, clientName })
     }),
     { headers: jsonHeaders(), tags: { endpoint: 'auth_login' } },
   );
+}
+
+export function login({ authBaseUrl, email, password, fingerprint, clientName }) {
+  const response = loginResponse({ authBaseUrl, email, password, fingerprint, clientName });
   require2xx(response, `login ${email}`);
   const token = response.json('access_token') || '';
   if (!token) {
@@ -44,11 +52,15 @@ export function login({ authBaseUrl, email, password, fingerprint, clientName })
   return token;
 }
 
-export function authMe({ authBaseUrl, accessToken }) {
-  const response = http.get(`${authBaseUrl}/v1/auth/me`, {
+export function authMeResponse({ authBaseUrl, accessToken }) {
+  return http.get(`${authBaseUrl}/v1/auth/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     tags: { endpoint: 'auth_me' },
   });
+}
+
+export function authMe({ authBaseUrl, accessToken }) {
+  const response = authMeResponse({ authBaseUrl, accessToken });
   require2xx(response, 'auth me');
   return response.json();
 }

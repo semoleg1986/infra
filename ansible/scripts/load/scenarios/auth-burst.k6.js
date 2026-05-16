@@ -1,6 +1,10 @@
-import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Counter, Rate, Trend } from 'k6/metrics';
+import {
+  authMeResponse,
+  loginResponse,
+  register,
+} from '../shared/http.js';
 
 const authBaseUrl = (__ENV.AUTH_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 const registerEnabled = (__ENV.AUTH_REGISTER_ENABLED || 'true').toLowerCase() !== 'false';
@@ -36,87 +40,52 @@ function uniqueUser() {
   return {
     email: `load.auth.${suffix}@example.com`,
     password: __ENV.AUTH_PASSWORD || 'LoadTest12345!',
-    default_role: __ENV.AUTH_DEFAULT_ROLE || 'parent',
+    defaultRole: __ENV.AUTH_DEFAULT_ROLE || 'parent',
   };
-}
-
-function registerUser(user) {
-  const response = http.post(
-    `${authBaseUrl}/v1/auth/register`,
-    JSON.stringify({
-      email: user.email,
-      password: user.password,
-      default_role: user.default_role,
-    }),
-    {
-      headers: { 'Content-Type': 'application/json' },
-      tags: { endpoint: 'auth_register' },
-    },
-  );
-
-  check(response, {
-    'register status is 200': (r) => r.status === 200,
-  });
-
-  if (response.status !== 200) {
-    throw new Error(`register failed: HTTP ${response.status} ${response.body}`);
-  }
 }
 
 export function setup() {
-  const user = {
-    email: __ENV.AUTH_EMAIL,
-    password: __ENV.AUTH_PASSWORD,
-    default_role: __ENV.AUTH_DEFAULT_ROLE || 'parent',
-  };
+  const configuredEmail = __ENV.AUTH_EMAIL || '';
+  const configuredPassword = __ENV.AUTH_PASSWORD || '';
+  const defaultRole = __ENV.AUTH_DEFAULT_ROLE || 'parent';
 
-  if (user.email && user.password) {
-    return { mode: 'single', users: [user] };
+  if (configuredEmail && configuredPassword) {
+    return { users: [{ email: configuredEmail, password: configuredPassword, defaultRole }] };
   }
 
   if (!registerEnabled) {
-    throw new Error(
-      'AUTH_EMAIL/AUTH_PASSWORD are required when AUTH_REGISTER_ENABLED=false',
-    );
+    throw new Error('AUTH_EMAIL/AUTH_PASSWORD are required when AUTH_REGISTER_ENABLED=false');
   }
 
   const users = [];
   for (let i = 0; i < userPoolSize; i += 1) {
-    const generated = uniqueUser();
-    registerUser(generated);
-    users.push(generated);
+    const user = uniqueUser();
+    register({ authBaseUrl, email: user.email, password: user.password, defaultRole: user.defaultRole });
+    users.push(user);
   }
-  return { mode: 'pool', users };
+  return { users };
 }
 
 export default function (data) {
   const users = data.users || [];
   const user = users[__ITER % users.length];
-  const loginResponse = http.post(
-    `${authBaseUrl}/v1/auth/login`,
-    JSON.stringify({
-      email: user.email,
-      password: user.password,
-      session_fingerprint: `k6-${__VU}-${__ITER}`,
-      client_name: 'k6-load-baseline',
-      auth_method: 'password',
-    }),
-    {
-      headers: { 'Content-Type': 'application/json' },
-      tags: { endpoint: 'auth_login' },
-    },
-  );
-
-  loginDuration.add(loginResponse.timings.duration);
-  const loginStatusOk = check(loginResponse, {
-    'login status is 200': (r) => r.status === 200,
+  const loginResult = loginResponse({
+    authBaseUrl,
+    email: user.email,
+    password: user.password,
+    fingerprint: `k6-${__VU}-${__ITER}`,
+    clientName: 'k6-load-baseline',
   });
 
+  loginDuration.add(loginResult.timings.duration);
+  const loginStatusOk = check(loginResult, {
+    'login status is 200': (r) => r.status === 200,
+  });
   if (!loginStatusOk) {
     loginFailures.add(1);
-    if (loginResponse.status === 429) {
+    if (loginResult.status === 429) {
       login429s.add(1);
-    } else if (loginResponse.status >= 500) {
+    } else if (loginResult.status >= 500) {
       login5xxs.add(1);
     } else {
       loginOtherErrors.add(1);
@@ -128,27 +97,21 @@ export default function (data) {
 
   let accessToken = '';
   try {
-    accessToken = loginResponse.json('access_token') || '';
+    accessToken = loginResult.json('access_token') || '';
   } catch (_) {
     accessToken = '';
   }
-
-  const loginOk = check(loginResponse, {
+  const loginTokenOk = check(loginResult, {
     'login returns access token': () => Boolean(accessToken),
   });
-
-  if (!loginOk) {
+  if (!loginTokenOk) {
     loginFailures.add(1);
     successRate.add(false);
     sleep(thinkTimeSeconds);
     return;
   }
 
-  const meResponse = http.get(`${authBaseUrl}/v1/auth/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    tags: { endpoint: 'auth_me' },
-  });
-
+  const meResponse = authMeResponse({ authBaseUrl, accessToken });
   meDuration.add(meResponse.timings.duration);
   let meEmail = '';
   try {
@@ -160,11 +123,10 @@ export default function (data) {
     'me status is 200': (r) => r.status === 200,
     'me returns same email': () => meEmail === user.email,
   });
-
   if (!meOk) {
     meFailures.add(1);
   }
 
-  successRate.add(loginOk && meOk);
+  successRate.add(loginTokenOk && meOk);
   sleep(thinkTimeSeconds);
 }

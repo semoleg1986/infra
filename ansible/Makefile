@@ -8,7 +8,7 @@ VARS := -e @group_vars/all.yml -e @group_vars/$(ENV).yml -e @group_vars/vault.ym
 ASK_FLAGS ?= --ask-vault-pass -K
 COMMON := ANSIBLE_ROLES_PATH=./roles ansible-playbook -i $(INVENTORY) -c local $(VARS) $(ASK_FLAGS)
 
-.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill restore-cleanup ops-check dispatch-outbox dispatch-payments-outbox dispatch-course-outbox load-auth-burst load-live-room-burst load-payment-access-progress load-payment-bonus-checkout chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
+.PHONY: help ping deploy deploy-target rollback status status-target smoke backup-postgres backup-rotate restore-drill restore-cleanup ops-check dispatch-outbox dispatch-payments-outbox dispatch-course-outbox load-auth-burst load-live-room-burst load-payment-access-progress load-payment-bonus-checkout load-payment-throttle-guard chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
 
 help:
 	@echo "make deploy                          # full deploy for ENV=$(ENV)"
@@ -27,8 +27,9 @@ help:
 	@echo "make dispatch-course-outbox          # drain only course_service outbox"
 	@echo "make load-auth-burst                 # run server-side auth load baseline via Dockerized k6"
 	@echo "make load-live-room-burst            # run server-side live join/leave baseline via Dockerized k6"
-	@echo "make load-payment-access-progress    # run offer-based payment/access/progress baseline via Dockerized k6"
+	@echo "make load-payment-access-progress    # run offer-based success-baseline checkout via Dockerized k6"
 	@echo "make load-payment-bonus-checkout     # run offer-based payment+bonus checkout baseline via Dockerized k6"
+	@echo "make load-payment-throttle-guard     # run repeated checkout pressure to observe 429/guard behavior"
 	@echo "make chaos-auth-restart              # restart auth_service mid-drill and verify recovery"
 	@echo "make chaos-users-restart             # restart users_service mid-drill and verify recovery"
 	@echo "make chaos-payments-restart          # restart payments_service mid-drill and verify recovery"
@@ -101,6 +102,9 @@ load-payment-access-progress:
 
 load-payment-bonus-checkout:
 	./scripts/load_payment_bonus_checkout.sh
+
+load-payment-throttle-guard:
+	./scripts/load_payment_throttle_guard.sh
 
 chaos-auth-restart:
 	./scripts/chaos_auth_restart.sh

@@ -253,8 +253,12 @@ crontab -e
   и запускает `make dispatch-outbox` каждые 5 минут с `flock`.
 
 ## Load Baseline (Sprint 6 - 3.2)
+- Структура `k6` сценариев:
+  - `scripts/load/shared/*.js` - общие HTTP/auth/catalog/payments/bonus/learning/live helpers
+  - `scripts/load/scenarios/*.k6.js` - тонкие entrypoints под конкретные профили нагрузки
+
 - Первый server-side сценарий:
-  - `scripts/load/auth-burst.k6.js`
+  - `scripts/load/scenarios/auth-burst.k6.js`
 - Обертка запуска:
   - `scripts/load_auth_burst.sh`
 - Команда:
@@ -288,7 +292,7 @@ crontab -e
   - для throughput baseline лучше оставлять auto-register pool mode
 
 - Второй server-side сценарий:
-  - `scripts/load/live-room-burst.k6.js`
+  - `scripts/load/scenarios/live-room-burst.k6.js`
 - Обертка запуска:
   - `scripts/load_live_room_burst.sh`
 - Команда:
@@ -297,17 +301,17 @@ crontab -e
   ```
 - По умолчанию сценарий:
   - логинится admin-пользователем
-  - в `setup()` поднимает teacher/course/published lesson
+  - резолвит preseeded `offer_id` через `commercial_catalog_service`
   - создает parent + pool student-аккаунтов
-  - выдает course access через `payments_service`
-  - создает один live room с лимитом участников выше пула
+  - выдает access через `payments_service` по `offer_id`
+  - создает pool live rooms на переданном `lesson_id`
   - в основном цикле каждый VU работает со своим student identity:
     - `join`
     - `leave`
     - `attendance read`
 - Полезные overrides:
   ```bash
-  K6_VUS=20 K6_DURATION=2m K6_USER_POOL_SIZE=20 K6_ROOM_POOL_SIZE=20 K6_SETUP_TIMEOUT=20m make load-live-room-burst
+  K6_LIVE_OFFER_ID=<offer-id> K6_LIVE_LESSON_ID=<lesson-id> K6_VUS=20 K6_DURATION=2m K6_USER_POOL_SIZE=20 K6_ROOM_POOL_SIZE=20 K6_SETUP_TIMEOUT=20m make load-live-room-burst
   ```
 - Важно:
   - этот профиль намеренно не меряет auth rate-limit
@@ -315,7 +319,7 @@ crontab -e
   - чтобы не мерить artificial optimistic-lock contention на одной комнате, можно разносить `VU` по пулу комнат через `K6_ROOM_POOL_SIZE`
 
 - Третий server-side сценарий:
-  - `scripts/load/payment-access-progress.k6.js`
+  - `scripts/load/scenarios/payment-access-progress.k6.js`
 - Обертка запуска:
   - `scripts/load_payment_access_progress.sh`
 - Команда:

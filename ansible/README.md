@@ -340,20 +340,47 @@ crontab -e
   ```
 - По умолчанию сценарий:
   - логинится admin-пользователем
-  - в `setup()` поднимает teacher/course/two published lessons
+  - резолвит preseeded `offer_id` через `commercial_catalog_service`
   - создает parent + student pool
   - основной цикл выполняет:
     - `POST /v1/parent/payments/intents`
     - `POST /v1/admin/payments/{id}/approve`
     - `GET /internal/v1/access/{course_id}/{student_id}`
-    - `POST /v1/student/courses/{course_id}/lessons/{lesson_id}/complete`
-    - `GET /v1/student/courses/{course_id}/progress`
-    - `GET /v1/parent/students/{student_id}/courses/progress`
-    - `GET /v1/parent/students/{student_id}/courses/completed`
+    - при `K6_LEARNING_ENABLED=1` дополнительно:
+      - `POST /v1/student/courses/{course_id}/lessons/{lesson_id}/complete`
+      - `GET /v1/student/courses/{course_id}/progress`
+      - `GET /v1/parent/students/{student_id}/courses/progress`
+      - `GET /v1/parent/students/{student_id}/courses/completed`
 - Полезные overrides:
   ```bash
-  K6_VUS=5 K6_DURATION=2m K6_USER_POOL_SIZE=5 K6_SETUP_TIMEOUT=20m make load-payment-access-progress
+  K6_PAYMENT_OFFER_ID=<offer-id> K6_LEARNING_ENABLED=0 K6_VUS=5 K6_USER_POOL_SIZE=5 K6_SETUP_TIMEOUT=20m make load-payment-access-progress
   ```
+- Важно:
+  - это success baseline, он должен исполнять конечный prebuilt pool сценариев, а не бесконечно давить один checkout path
+  - для learning нужны реальные `K6_LEARNING_LESSON1_ID` и `K6_LEARNING_LESSON2_ID`
+
+- Четвертый server-side сценарий:
+  - `scripts/load/scenarios/payment-bonus-checkout.k6.js`
+- Обертка запуска:
+  - `scripts/load_payment_bonus_checkout.sh`
+- Команда:
+  ```bash
+  make load-payment-bonus-checkout
+  ```
+- Назначение:
+  - тот же success baseline checkout, но с bonus accrual/redeem поверх `offer_id` flow
+
+- Пятый server-side сценарий:
+  - `scripts/load/scenarios/payment-throttle-guard.k6.js`
+- Обертка запуска:
+  - `scripts/load_payment_throttle_guard.sh`
+- Команда:
+  ```bash
+  make load-payment-throttle-guard
+  ```
+- Назначение:
+  - намеренно давить `create payment intent` и наблюдать `429`/guard behavior
+  - не использовать как success baseline
 
 ## Chaos / Failure Drill (Sprint 6 - 3.3)
 - Первый server-side drill:

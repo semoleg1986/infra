@@ -6,7 +6,10 @@ const authBaseUrl = (__ENV.AUTH_BASE_URL || 'http://127.0.0.1:8000').replace(/\/
 const usersBaseUrl = (__ENV.USERS_BASE_URL || 'http://127.0.0.1:8002').replace(/\/$/, '');
 const courseBaseUrl = (__ENV.COURSE_BASE_URL || 'http://127.0.0.1:8001').replace(/\/$/, '');
 const paymentsBaseUrl = (__ENV.PAYMENTS_BASE_URL || 'http://127.0.0.1:8004').replace(/\/$/, '');
+const commercialCatalogBaseUrl = (__ENV.COMMERCIAL_CATALOG_BASE_URL || 'http://127.0.0.1:8007').replace(/\/$/, '');
+const bonusBaseUrl = (__ENV.BONUS_BASE_URL || 'http://127.0.0.1:8006').replace(/\/$/, '');
 const serviceToken = __ENV.SERVICE_TOKEN || 'sometokencourse';
+const bonusServiceToken = __ENV.BONUS_SERVICE_TOKEN || serviceToken;
 const vus = Number(__ENV.K6_VUS || 5);
 const duration = __ENV.K6_DURATION || '2m';
 const thinkTimeSeconds = Number(__ENV.K6_THINK_TIME_SECONDS || 0.2);
@@ -16,6 +19,12 @@ const adminEmail = __ENV.ADMIN_EMAIL || 'admin@example.com';
 const adminPassword = __ENV.ADMIN_PASSWORD || 'admin12345';
 const studentPassword = __ENV.STUDENT_PASSWORD || 'student12345';
 const parentPassword = __ENV.PARENT_PASSWORD || 'parent12345';
+const paymentOfferId = __ENV.K6_PAYMENT_OFFER_ID || '';
+const learningEnabled = (__ENV.K6_LEARNING_ENABLED || '1') === '1';
+const learningLesson1Id = __ENV.K6_LEARNING_LESSON1_ID || '';
+const learningLesson2Id = __ENV.K6_LEARNING_LESSON2_ID || '';
+const bonusEnabled = (__ENV.K6_BONUS_ENABLED || '0') === '1';
+const bonusAmount = Number(__ENV.K6_BONUS_AMOUNT || 30);
 
 const paymentCreateDuration = new Trend('payment_create_duration_ms');
 const paymentApproveDuration = new Trend('payment_approve_duration_ms');
@@ -24,12 +33,14 @@ const lessonCompleteDuration = new Trend('learning_complete_duration_ms');
 const studentProgressDuration = new Trend('learning_student_progress_duration_ms');
 const parentProgressDuration = new Trend('learning_parent_progress_duration_ms');
 const parentCompletedDuration = new Trend('learning_parent_completed_duration_ms');
+const bonusAccrualDuration = new Trend('bonus_accrual_duration_ms');
 const successRate = new Rate('payment_access_progress_success_rate');
 
 const paymentCreateFailures = new Counter('payment_create_failures_total');
 const paymentApproveFailures = new Counter('payment_approve_failures_total');
 const accessCheckFailures = new Counter('payment_access_check_failures_total');
 const learningFailures = new Counter('learning_progress_failures_total');
+const bonusAccrualFailures = new Counter('bonus_accrual_failures_total');
 const paymentCreate409s = new Counter('payment_create_status_409_total');
 const paymentCreate400s = new Counter('payment_create_status_400_total');
 const paymentCreate401s = new Counter('payment_create_status_401_total');
@@ -52,6 +63,7 @@ export const options = {
     payment_create_duration_ms: ['p(95)<500'],
     payment_approve_duration_ms: ['p(95)<500'],
     payment_access_check_duration_ms: ['p(95)<250'],
+    bonus_accrual_duration_ms: ['p(95)<300'],
     learning_complete_duration_ms: ['p(95)<500'],
     learning_student_progress_duration_ms: ['p(95)<250'],
     learning_parent_progress_duration_ms: ['p(95)<250'],
@@ -172,96 +184,17 @@ function createParentStudentLink(accessToken, parentId, studentId) {
   require2xx(response, `create parent-student link ${parentId}:${studentId}`);
 }
 
-function createCourse(accessToken, teacherId, suffix) {
-  const courseResponse = http.post(
-    `${courseBaseUrl}/v1/admin/courses`,
-    JSON.stringify({
-      title: `Load Payment Course ${suffix}`,
-      teacher_id: teacherId,
-      starts_at: '2026-09-01T09:00:00Z',
-      duration_days: 30,
-    }),
-    {
-      headers: jsonHeaders({ Authorization: `Bearer ${accessToken}` }),
-      tags: { endpoint: 'course_create' },
-    },
-  );
-  require2xx(courseResponse, 'create course');
-  const courseId = courseResponse.json('course_id') || '';
-  if (!courseId) {
-    throw new Error('create course returned empty course_id');
-  }
-
-  const moduleId = `module-load-${suffix}`;
-  const lesson1Id = `lesson-load-${suffix}-1`;
-  const lesson2Id = `lesson-load-${suffix}-2`;
-
-  const moduleResponse = http.post(
-    `${courseBaseUrl}/v1/admin/courses/${courseId}/modules`,
-    JSON.stringify({
-      module_id: moduleId,
-      title: `Load Module ${suffix}`,
-      description: 'load',
-      is_required: true,
-    }),
-    {
-      headers: jsonHeaders({ Authorization: `Bearer ${accessToken}` }),
-      tags: { endpoint: 'course_module_create' },
-    },
-  );
-  require2xx(moduleResponse, 'create module');
-
-  [lesson1Id, lesson2Id].forEach((lessonId, index) => {
-    const lessonResponse = http.post(
-      `${courseBaseUrl}/v1/admin/courses/${courseId}/modules/${moduleId}/lessons`,
-      JSON.stringify({
-        lesson_id: lessonId,
-        title: `Load Lesson ${index + 1}`,
-        description: 'load',
-        content_type: 'video',
-        content_ref: `cdn://load/${suffix}/${index + 1}`,
-        duration_minutes: 15,
-        is_preview: false,
-      }),
-      {
-        headers: jsonHeaders({ Authorization: `Bearer ${accessToken}` }),
-        tags: { endpoint: 'course_lesson_create' },
-      },
-    );
-    require2xx(lessonResponse, `create lesson ${lessonId}`);
-
-    const lessonPublishResponse = http.patch(
-      `${courseBaseUrl}/v1/admin/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}`,
-      JSON.stringify({ status: 'published' }),
-      {
-        headers: jsonHeaders({ Authorization: `Bearer ${accessToken}` }),
-        tags: { endpoint: 'course_lesson_publish' },
-      },
-    );
-    require2xx(lessonPublishResponse, `publish lesson ${lessonId}`);
+function resolveOfferSnapshot(offerId) {
+  const response = http.get(`${commercialCatalogBaseUrl}/internal/v1/offers/${offerId}`, {
+    headers: { 'X-Service-Token': serviceToken },
+    tags: { endpoint: 'commercial_catalog_offer_snapshot' },
   });
-
-  const modulePublishResponse = http.patch(
-    `${courseBaseUrl}/v1/admin/courses/${courseId}/modules/${moduleId}`,
-    JSON.stringify({ status: 'published' }),
-    {
-      headers: jsonHeaders({ Authorization: `Bearer ${accessToken}` }),
-      tags: { endpoint: 'course_module_publish' },
-    },
-  );
-  require2xx(modulePublishResponse, 'publish module');
-
-  const publishResponse = http.post(
-    `${courseBaseUrl}/v1/admin/courses/${courseId}/publish`,
-    null,
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      tags: { endpoint: 'course_publish' },
-    },
-  );
-  require2xx(publishResponse, 'publish course');
-
-  return { courseId, lesson1Id, lesson2Id };
+  require2xx(response, `resolve offer snapshot ${offerId}`);
+  const courseId = response.json('course_id') || '';
+  if (!courseId) {
+    throw new Error(`offer snapshot ${offerId} returned empty course_id`);
+  }
+  return { courseId };
 }
 
 function waitForAccess(courseId, studentId) {
@@ -283,16 +216,33 @@ function waitForAccess(courseId, studentId) {
   throw new Error(`internal access check did not become ready for student ${studentId}`);
 }
 
+function accrueBonus(parentId, suffix) {
+  const response = http.post(
+    `${bonusBaseUrl}/internal/v1/bonus/accruals`,
+    JSON.stringify({
+      parent_id: parentId,
+      amount: bonusAmount,
+      reason_code: 'k6_smoke_reward',
+      reference_id: `k6-pay-${suffix}-${__VU}-${__ITER}`,
+      idempotency_key: `k6-bonus-${suffix}-${__VU}-${__ITER}`,
+    }),
+    {
+      headers: jsonHeaders({ 'X-Service-Token': bonusServiceToken }),
+      tags: { endpoint: 'bonus_internal_accrual' },
+    },
+  );
+  bonusAccrualDuration.add(response.timings.duration);
+  const accrualOk = check(response, {
+    'bonus accrual status is 2xx': (r) => r.status >= 200 && r.status < 300,
+  });
+  if (!accrualOk) {
+    bonusAccrualFailures.add(1);
+    throw new Error(`bonus accrual failed: HTTP ${response.status} ${response.body}`);
+  }
+}
+
 function buildScenario(index, adminToken) {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${index}`;
-  const teacher = createAdminUser(adminToken, {
-    user_id: `teacher-pay-${suffix}`,
-    email: `teacher.pay.${suffix}@example.com`,
-    display_name: `Load Teacher ${suffix}`,
-    roles: ['teacher'],
-  });
-  const course = createCourse(adminToken, teacher.user_id, suffix);
-
   const parentEmail = `parent.pay.${suffix}@example.com`;
   register(parentEmail, parentPassword, 'parent');
   const parentToken = login(parentEmail, parentPassword, `k6-pay-parent-${suffix}`, 'k6-pay-parent');
@@ -320,9 +270,6 @@ function buildScenario(index, adminToken) {
 
   return {
     suffix,
-    courseId: course.courseId,
-    lesson1Id: course.lesson1Id,
-    lesson2Id: course.lesson2Id,
     parentId,
     parentToken,
     studentId,
@@ -331,10 +278,24 @@ function buildScenario(index, adminToken) {
 }
 
 export function setup() {
+  if (!paymentOfferId) {
+    throw new Error('K6_PAYMENT_OFFER_ID is required');
+  }
+  if (learningEnabled && (!learningLesson1Id || !learningLesson2Id)) {
+    throw new Error('K6_LEARNING_LESSON1_ID and K6_LEARNING_LESSON2_ID are required when K6_LEARNING_ENABLED=1');
+  }
+
   const adminToken = login(adminEmail, adminPassword, `k6-pay-admin-${Date.now()}`, 'k6-pay-admin');
+  const offer = resolveOfferSnapshot(paymentOfferId);
   const scenarios = [];
   for (let i = 0; i < scenarioPoolSize; i += 1) {
-    scenarios.push(buildScenario(i + 1, adminToken));
+    scenarios.push({
+      ...buildScenario(i + 1, adminToken),
+      offerId: paymentOfferId,
+      courseId: offer.courseId,
+      lesson1Id: learningLesson1Id,
+      lesson2Id: learningLesson2Id,
+    });
   }
   return { adminToken, scenarios };
 }
@@ -346,12 +307,23 @@ export default function (data) {
   }
   const scenario = scenarios[(__VU - 1) % scenarios.length];
 
+  if (bonusEnabled) {
+    try {
+      accrueBonus(scenario.parentId, scenario.suffix);
+    } catch (_) {
+      successRate.add(false);
+      sleep(thinkTimeSeconds);
+      return;
+    }
+  }
+
   const paymentResponse = http.post(
     `${paymentsBaseUrl}/v1/parent/payments/intents`,
     JSON.stringify({
       parent_id: scenario.parentId,
       student_id: scenario.studentId,
-      course_id: scenario.courseId,
+      offer_id: scenario.offerId,
+      bonus_amount: bonusEnabled ? bonusAmount : 0,
       idempotency_key: `k6-pay-${scenario.suffix}-${__VU}-${__ITER}`,
     }),
     {
@@ -413,103 +385,114 @@ export default function (data) {
     return;
   }
 
-  const complete1Response = http.post(
-    `${courseBaseUrl}/v1/student/courses/${scenario.courseId}/lessons/${scenario.lesson1Id}/complete`,
-    null,
-    {
-      headers: { Authorization: `Bearer ${scenario.studentToken}` },
-      tags: { endpoint: 'student_complete_lesson_1' },
-    },
-  );
-  lessonCompleteDuration.add(complete1Response.timings.duration);
-  const complete1Ok = check(complete1Response, {
-    'complete lesson 1 status is 2xx': (r) => r.status >= 200 && r.status < 300,
-  });
-  if (!complete1Ok) {
-    learningFailures.add(1);
-    successRate.add(false);
-    sleep(thinkTimeSeconds);
-    return;
-  }
+  let complete1Ok = true;
+  let complete2Ok = true;
+  let studentProgressOk = true;
+  let parentProgressOk = true;
+  let parentCompletedOk = true;
 
-  const complete2Response = http.post(
-    `${courseBaseUrl}/v1/student/courses/${scenario.courseId}/lessons/${scenario.lesson2Id}/complete`,
-    null,
-    {
-      headers: { Authorization: `Bearer ${scenario.studentToken}` },
-      tags: { endpoint: 'student_complete_lesson_2' },
-    },
-  );
-  lessonCompleteDuration.add(complete2Response.timings.duration);
-  const complete2Ok = check(complete2Response, {
-    'complete lesson 2 status is 2xx': (r) => r.status >= 200 && r.status < 300,
-    'complete lesson 2 returns completed course': (r) => r.json('course_status') === 'completed',
-  });
-  if (!complete2Ok) {
-    learningFailures.add(1);
-    successRate.add(false);
-    sleep(thinkTimeSeconds);
-    return;
-  }
+  if (learningEnabled) {
+    const complete1Response = http.post(
+      `${courseBaseUrl}/v1/student/courses/${scenario.courseId}/lessons/${scenario.lesson1Id}/complete`,
+      null,
+      {
+        headers: { Authorization: `Bearer ${scenario.studentToken}` },
+        tags: { endpoint: 'student_complete_lesson_1' },
+      },
+    );
+    lessonCompleteDuration.add(complete1Response.timings.duration);
+    complete1Ok = check(complete1Response, {
+      'complete lesson 1 status is 2xx': (r) => r.status >= 200 && r.status < 300,
+    });
+    if (!complete1Ok) {
+      learningFailures.add(1);
+      successRate.add(false);
+      sleep(thinkTimeSeconds);
+      return;
+    }
 
-  const studentProgressResponse = http.get(
-    `${courseBaseUrl}/v1/student/courses/${scenario.courseId}/progress`,
-    {
-      headers: { Authorization: `Bearer ${scenario.studentToken}` },
-      tags: { endpoint: 'student_progress' },
-    },
-  );
-  studentProgressDuration.add(studentProgressResponse.timings.duration);
-  const studentProgressOk = check(studentProgressResponse, {
-    'student progress status is 200': (r) => r.status === 200,
-    'student progress is 100': (r) => r.json('progress_percent') === 100 || r.json('progress_percent') === 100.0,
-  });
-  if (!studentProgressOk) {
-    learningFailures.add(1);
-    successRate.add(false);
-    sleep(thinkTimeSeconds);
-    return;
-  }
+    const complete2Response = http.post(
+      `${courseBaseUrl}/v1/student/courses/${scenario.courseId}/lessons/${scenario.lesson2Id}/complete`,
+      null,
+      {
+        headers: { Authorization: `Bearer ${scenario.studentToken}` },
+        tags: { endpoint: 'student_complete_lesson_2' },
+      },
+    );
+    lessonCompleteDuration.add(complete2Response.timings.duration);
+    complete2Ok = check(complete2Response, {
+      'complete lesson 2 status is 2xx': (r) => r.status >= 200 && r.status < 300,
+      'complete lesson 2 returns completed course': (r) => r.json('course_status') === 'completed',
+    });
+    if (!complete2Ok) {
+      learningFailures.add(1);
+      successRate.add(false);
+      sleep(thinkTimeSeconds);
+      return;
+    }
 
-  const parentProgressResponse = http.get(
-    `${courseBaseUrl}/v1/parent/students/${scenario.studentId}/courses/progress?status=completed&limit=10&offset=0`,
-    {
-      headers: { Authorization: `Bearer ${data.adminToken}` },
-      tags: { endpoint: 'parent_progress' },
-    },
-  );
-  parentProgressDuration.add(parentProgressResponse.timings.duration);
-  const parentProgressOk = check(parentProgressResponse, {
-    'parent progress status is 200': (r) => r.status === 200,
-    'parent progress contains completed course': (r) =>
-      (r.json('items') || []).some(
-        (item) => item.course_id === scenario.courseId && item.status === 'completed',
-      ),
-  });
-  if (!parentProgressOk) {
-    learningFailures.add(1);
-    successRate.add(false);
-    sleep(thinkTimeSeconds);
-    return;
-  }
+    const studentProgressResponse = http.get(
+      `${courseBaseUrl}/v1/student/courses/${scenario.courseId}/progress`,
+      {
+        headers: { Authorization: `Bearer ${scenario.studentToken}` },
+        tags: { endpoint: 'student_progress' },
+      },
+    );
+    studentProgressDuration.add(studentProgressResponse.timings.duration);
+    studentProgressOk = check(studentProgressResponse, {
+      'student progress status is 200': (r) => r.status === 200,
+      'student progress is 100': (r) => r.json('progress_percent') === 100 || r.json('progress_percent') === 100.0,
+    });
+    if (!studentProgressOk) {
+      learningFailures.add(1);
+      successRate.add(false);
+      sleep(thinkTimeSeconds);
+      return;
+    }
 
-  const parentCompletedResponse = http.get(
-    `${courseBaseUrl}/v1/parent/students/${scenario.studentId}/courses/completed?limit=10&offset=0`,
-    {
-      headers: { Authorization: `Bearer ${data.adminToken}` },
-      tags: { endpoint: 'parent_completed' },
-    },
-  );
-  parentCompletedDuration.add(parentCompletedResponse.timings.duration);
-  const parentCompletedOk = check(parentCompletedResponse, {
-    'parent completed status is 200': (r) => r.status === 200,
-    'parent completed contains course': (r) =>
-      (r.json('items') || []).some(
-        (item) => item.course_id === scenario.courseId && Boolean(item.completed_at),
-      ),
-  });
-  if (!parentCompletedOk) {
-    learningFailures.add(1);
+    const parentProgressResponse = http.get(
+      `${courseBaseUrl}/v1/parent/students/${scenario.studentId}/courses/progress?status=completed&limit=10&offset=0`,
+      {
+        headers: { Authorization: `Bearer ${data.adminToken}` },
+        tags: { endpoint: 'parent_progress' },
+      },
+    );
+    parentProgressDuration.add(parentProgressResponse.timings.duration);
+    parentProgressOk = check(parentProgressResponse, {
+      'parent progress status is 200': (r) => r.status === 200,
+      'parent progress contains completed course': (r) =>
+        (r.json('items') || []).some(
+          (item) => item.course_id === scenario.courseId && item.status === 'completed',
+        ),
+    });
+    if (!parentProgressOk) {
+      learningFailures.add(1);
+      successRate.add(false);
+      sleep(thinkTimeSeconds);
+      return;
+    }
+
+    const parentCompletedResponse = http.get(
+      `${courseBaseUrl}/v1/parent/students/${scenario.studentId}/courses/completed?limit=10&offset=0`,
+      {
+        headers: { Authorization: `Bearer ${data.adminToken}` },
+        tags: { endpoint: 'parent_completed' },
+      },
+    );
+    parentCompletedDuration.add(parentCompletedResponse.timings.duration);
+    parentCompletedOk = check(parentCompletedResponse, {
+      'parent completed status is 200': (r) => r.status === 200,
+      'parent completed contains course': (r) =>
+        (r.json('items') || []).some(
+          (item) => item.course_id === scenario.courseId && Boolean(item.completed_at),
+        ),
+    });
+    if (!parentCompletedOk) {
+      learningFailures.add(1);
+      successRate.add(false);
+      sleep(thinkTimeSeconds);
+      return;
+    }
   }
 
   successRate.add(

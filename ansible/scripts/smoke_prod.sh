@@ -237,11 +237,11 @@ if [[ -z "${MODULE_ID}" || "${MODULE_ID}" == "module-smoke" ]]; then
 fi
 
 for LESSON_NUM in 1 2; do
-  LESSON_ID="lesson-smoke-${SMOKE_ID}-${LESSON_NUM}"
+  REQUESTED_LESSON_ID="lesson-smoke-${SMOKE_ID}-${LESSON_NUM}"
   LESSON_PAYLOAD="${TMP_DIR}/lesson-${LESSON_NUM}.json"
   cat > "${LESSON_PAYLOAD}" <<JSON
 {
-  "lesson_id": "${LESSON_ID}",
+  "lesson_id": "${REQUESTED_LESSON_ID}",
   "title": "Smoke Lesson ${LESSON_NUM}",
   "description": "smoke",
   "content_type": "video",
@@ -253,6 +253,17 @@ JSON
   LESSON_OUT="${TMP_DIR}/lesson-${LESSON_NUM}.out.json"
   LESSON_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/admin/courses/${COURSE_ID}/modules/${MODULE_ID}/lessons" "${LESSON_PAYLOAD}" "${LESSON_OUT}" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "Content-Type: application/json")"
   assert_2xx "${LESSON_STATUS}" "${LESSON_OUT}" "create lesson ${LESSON_NUM}"
+
+  LESSON_ID="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("lesson_id",""))' "${LESSON_OUT}")"
+  if [[ -z "${LESSON_ID}" ]]; then
+    LESSON_ID="${REQUESTED_LESSON_ID}"
+  fi
+
+  if [[ "${LESSON_NUM}" == "1" ]]; then
+    LESSON1_ID="${LESSON_ID}"
+  else
+    LESSON2_ID="${LESSON_ID}"
+  fi
 
   LESSON_PATCH_PAYLOAD="${TMP_DIR}/lesson-${LESSON_NUM}.patch.json"
   cat > "${LESSON_PATCH_PAYLOAD}" <<JSON
@@ -776,9 +787,6 @@ JSON
   fi
 
   if [[ "${SMOKE_LEARNING_ENABLED}" == "1" ]]; then
-    LESSON1_ID="lesson-smoke-${SMOKE_ID}-1"
-    LESSON2_ID="lesson-smoke-${SMOKE_ID}-2"
-
     log "Student complete first lesson"
     STUDENT_COMPLETE1_OUT="${TMP_DIR}/student.complete1.out.json"
     STUDENT_COMPLETE1_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/v1/student/courses/${PAYMENT_COURSE_ID}/lessons/${LESSON1_ID}/complete" "" "${STUDENT_COMPLETE1_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}")"

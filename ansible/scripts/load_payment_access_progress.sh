@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOAD_DIR="${SCRIPT_DIR}/load"
 K6_SCRIPT="${K6_SCRIPT:-${LOAD_DIR}/scenarios/payment-access-progress.k6.js}"
+K6_SCRIPT_RELATIVE="${K6_SCRIPT#${LOAD_DIR}/}"
+K6_SCRIPT_IN_CONTAINER="/work/load/${K6_SCRIPT_RELATIVE}"
 
 AUTH_BASE_URL="${AUTH_BASE_URL:-http://127.0.0.1:8000}"
 USERS_BASE_URL="${USERS_BASE_URL:-http://127.0.0.1:8002}"
@@ -73,6 +75,7 @@ log "K6_THINK_TIME_SECONDS=${K6_THINK_TIME_SECONDS}"
 log "K6_USER_POOL_SIZE=${K6_USER_POOL_SIZE:-auto}"
 log "K6_SETUP_TIMEOUT=${K6_SETUP_TIMEOUT}"
 log "K6_DOCKER_IMAGE=${K6_DOCKER_IMAGE}"
+log "K6_SCRIPT_IN_CONTAINER=${K6_SCRIPT_IN_CONTAINER}"
 log "Using Docker host network for server-local traffic"
 
 exec docker run --rm \
@@ -102,4 +105,4 @@ exec docker run --rm \
   -e K6_USER_POOL_SIZE="${K6_USER_POOL_SIZE}" \
   -e K6_SETUP_TIMEOUT="${K6_SETUP_TIMEOUT}" \
   "${K6_DOCKER_IMAGE}" \
-  run /work/load/payment-access-progress.k6.js
+  run "${K6_SCRIPT_IN_CONTAINER}"

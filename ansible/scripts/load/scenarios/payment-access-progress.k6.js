@@ -159,7 +159,10 @@ export default function (data) {
   if (scenarios.length === 0) {
     throw new Error('setup did not provide scenarios');
   }
-  const scenarioIndex = exec.scenario.iterationInTest;
+  const iterationInTest = typeof exec.scenario.iterationInTest === 'number'
+    ? exec.scenario.iterationInTest
+    : __ITER;
+  const scenarioIndex = iterationInTest % scenarios.length;
   const scenario = scenarios[scenarioIndex];
   if (!scenario) {
     throw new Error(`setup scenario missing for iteration ${scenarioIndex}`);

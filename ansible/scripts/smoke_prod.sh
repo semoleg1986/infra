@@ -20,6 +20,7 @@ SMOKE_LIVE_ENABLED="${SMOKE_LIVE_ENABLED:-0}"
 SMOKE_ATTRIBUTION_ENABLED="${SMOKE_ATTRIBUTION_ENABLED:-0}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-1}"
 SMOKE_PAYMENTS_AUTO_CREATE_OFFER="${SMOKE_PAYMENTS_AUTO_CREATE_OFFER:-0}"
+SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD="${SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD:-}"
 SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-}"
 SMOKE_PAYMENTS_OFFER_ID="${SMOKE_PAYMENTS_OFFER_ID:-}"
 SMOKE_LEARNING_LESSON1_ID="${SMOKE_LEARNING_LESSON1_ID:-}"
@@ -436,7 +437,77 @@ JSON
 JSON
       OFFER_CREATE_OUT="${TMP_DIR}/offer.create.out.json"
       OFFER_CREATE_STATUS="$(request_json "POST" "${COMMERCIAL_CATALOG_BASE_URL}/internal/v1/course-offers" "${OFFER_CREATE_PAYLOAD}" "${OFFER_CREATE_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}" -H "Content-Type: application/json")"
-      assert_2xx "${OFFER_CREATE_STATUS}" "${OFFER_CREATE_OUT}" "create smoke offer"
+      if [[ "${OFFER_CREATE_STATUS}" =~ ^2 ]]; then
+        :
+      elif [[ -n "${SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD}" ]]; then
+        log "Seed smoke offer in commercial_catalog_service database"
+        OFFER_SQL="${TMP_DIR}/offer.create.sql"
+        cat > "${OFFER_SQL}" <<SQL
+INSERT INTO course_offers (
+  offer_id,
+  course_id,
+  offer_code,
+  title,
+  description_short,
+  sort_order,
+  delivery_mode,
+  teacher_included,
+  homework_review_included,
+  is_active,
+  is_default,
+  sellable_from,
+  sellable_to,
+  currency,
+  list_price,
+  sale_price,
+  discount_reason,
+  price_starts_at,
+  price_ends_at
+) VALUES (
+  '${PAYMENT_OFFER_ID}',
+  '${PAYMENT_COURSE_ID}',
+  'standard',
+  'Smoke Standard Offer ${SMOKE_ID}',
+  'Auto-created smoke offer',
+  0,
+  'online',
+  TRUE,
+  TRUE,
+  TRUE,
+  TRUE,
+  NULL,
+  NULL,
+  'USD',
+  100.0,
+  100.0,
+  NULL,
+  NULL,
+  NULL
+)
+ON CONFLICT (offer_id) DO UPDATE SET
+  course_id = EXCLUDED.course_id,
+  offer_code = EXCLUDED.offer_code,
+  title = EXCLUDED.title,
+  description_short = EXCLUDED.description_short,
+  sort_order = EXCLUDED.sort_order,
+  delivery_mode = EXCLUDED.delivery_mode,
+  teacher_included = EXCLUDED.teacher_included,
+  homework_review_included = EXCLUDED.homework_review_included,
+  is_active = EXCLUDED.is_active,
+  is_default = EXCLUDED.is_default,
+  sellable_from = EXCLUDED.sellable_from,
+  sellable_to = EXCLUDED.sellable_to,
+  currency = EXCLUDED.currency,
+  list_price = EXCLUDED.list_price,
+  sale_price = EXCLUDED.sale_price,
+  discount_reason = EXCLUDED.discount_reason,
+  price_starts_at = EXCLUDED.price_starts_at,
+  price_ends_at = EXCLUDED.price_ends_at;
+SQL
+        bash -lc "${SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD} < \"${OFFER_SQL}\"" >/dev/null
+      else
+        assert_2xx "${OFFER_CREATE_STATUS}" "${OFFER_CREATE_OUT}" "create smoke offer"
+      fi
     else
       log "ERROR payments smoke requires SMOKE_PAYMENTS_OFFER_ID"
       exit 1

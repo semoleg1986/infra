@@ -191,6 +191,7 @@ jobs:
           PAYMENTS_BASE_URL: http://127.0.0.1:8004
           SMOKE_PAYMENTS_ENABLED: "1"
           SMOKE_PAYMENTS_AUTO_CREATE_OFFER: "1"
+          SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD: docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d commercial_catalog_service_ci
           SERVICE_TOKEN: ${{ env.SERVICE_TOKEN }}
         run: |
           chmod +x ansible/scripts/smoke_prod.sh

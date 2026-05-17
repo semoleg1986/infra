@@ -429,8 +429,10 @@ services:
     env:
       NUXT_AUTH_SERVICE_BASE_URL: "{{ auth_service_internal_url }}"
       NUXT_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
+      NUXT_COMMERCIAL_CATALOG_SERVICE_BASE_URL: "{{ commercial_catalog_service_internal_url }}"
       NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
       NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
+      NUXT_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"
       NUXT_PUBLIC_SITE_URL: "http://localhost:3000"
     ports:
@@ -448,6 +450,7 @@ services:
     env:
       NUXT_AUTH_SERVICE_BASE_URL: "{{ auth_service_internal_url }}"
       NUXT_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
+      NUXT_COMMERCIAL_CATALOG_SERVICE_BASE_URL: "{{ commercial_catalog_service_internal_url }}"
       NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
       NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"
@@ -467,6 +470,7 @@ services:
     env:
       NUXT_AUTH_SERVICE_BASE_URL: "{{ auth_service_internal_url }}"
       NUXT_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
+      NUXT_COMMERCIAL_CATALOG_SERVICE_BASE_URL: "{{ commercial_catalog_service_internal_url }}"
       NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
       NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"

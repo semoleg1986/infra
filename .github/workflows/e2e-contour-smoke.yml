@@ -190,6 +190,7 @@ jobs:
           COMMERCIAL_CATALOG_BASE_URL: http://127.0.0.1:8007
           PAYMENTS_BASE_URL: http://127.0.0.1:8004
           SMOKE_PAYMENTS_ENABLED: "1"
+          SMOKE_PAYMENTS_AUTO_CREATE_OFFER: "1"
           SERVICE_TOKEN: ${{ env.SERVICE_TOKEN }}
         run: |
           chmod +x ansible/scripts/smoke_prod.sh

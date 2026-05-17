@@ -19,6 +19,7 @@ SMOKE_LEARNING_ENABLED="${SMOKE_LEARNING_ENABLED:-1}"
 SMOKE_LIVE_ENABLED="${SMOKE_LIVE_ENABLED:-0}"
 SMOKE_ATTRIBUTION_ENABLED="${SMOKE_ATTRIBUTION_ENABLED:-0}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-1}"
+SMOKE_PAYMENTS_AUTO_CREATE_OFFER="${SMOKE_PAYMENTS_AUTO_CREATE_OFFER:-0}"
 SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-}"
 SMOKE_PAYMENTS_OFFER_ID="${SMOKE_PAYMENTS_OFFER_ID:-}"
 SMOKE_LEARNING_LESSON1_ID="${SMOKE_LEARNING_LESSON1_ID:-}"
@@ -411,8 +412,35 @@ JSON
   fi
 
   if [[ -z "${PAYMENT_OFFER_ID}" ]]; then
-    log "ERROR payments smoke requires SMOKE_PAYMENTS_OFFER_ID"
-    exit 1
+    if [[ "${SMOKE_PAYMENTS_AUTO_CREATE_OFFER}" == "1" ]]; then
+      PAYMENT_OFFER_ID="${PAYMENT_COURSE_ID}-standard"
+      log "Create smoke offer in commercial_catalog_service"
+      OFFER_CREATE_PAYLOAD="${TMP_DIR}/offer.create.json"
+      cat > "${OFFER_CREATE_PAYLOAD}" <<JSON
+{
+  "offer_id": "${PAYMENT_OFFER_ID}",
+  "course_id": "${PAYMENT_COURSE_ID}",
+  "offer_code": "standard",
+  "title": "Smoke Standard Offer ${SMOKE_ID}",
+  "description_short": "Auto-created smoke offer",
+  "currency": "USD",
+  "list_price": 100.0,
+  "sale_price": 100.0,
+  "sort_order": 0,
+  "delivery_mode": "online",
+  "teacher_included": true,
+  "homework_review_included": true,
+  "is_active": true,
+  "is_default": true
+}
+JSON
+      OFFER_CREATE_OUT="${TMP_DIR}/offer.create.out.json"
+      OFFER_CREATE_STATUS="$(request_json "POST" "${COMMERCIAL_CATALOG_BASE_URL}/internal/v1/course-offers" "${OFFER_CREATE_PAYLOAD}" "${OFFER_CREATE_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}" -H "Content-Type: application/json")"
+      assert_2xx "${OFFER_CREATE_STATUS}" "${OFFER_CREATE_OUT}" "create smoke offer"
+    else
+      log "ERROR payments smoke requires SMOKE_PAYMENTS_OFFER_ID"
+      exit 1
+    fi
   fi
 
   log "Resolve offer snapshot in commercial_catalog_service"

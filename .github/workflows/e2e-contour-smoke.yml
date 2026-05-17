@@ -108,6 +108,8 @@ jobs:
                 PAYMENTS_AUTH_AUDIENCE: platform_clients
                 PAYMENTS_AUTH_JWKS_URL: http://auth_service:8000/.well-known/jwks.json
                 PAYMENTS_SERVICE_TOKEN: ${SERVICE_TOKEN}
+                PAYMENTS_COMMERCIAL_CATALOG_SERVICE_BASE_URL: http://commercial_catalog_service:8007
+                PAYMENTS_COMMERCIAL_CATALOG_SERVICE_TOKEN: ${SERVICE_TOKEN}
                 PAYMENTS_COURSE_SERVICE_BASE_URL: http://course_service:8001
                 PAYMENTS_COURSE_SERVICE_TOKEN: ${SERVICE_TOKEN}
                 PAYMENTS_USERS_SERVICE_BASE_URL: http://users_service:8002
@@ -117,6 +119,21 @@ jobs:
                   condition: service_healthy
               ports:
                 - "8004:8004"
+
+            commercial_catalog_service:
+              image: ghcr.io/semoleg1986/commercial_catalog_service:${IMAGE_TAG}
+              environment:
+                COMMERCIAL_CATALOG_DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/commercial_catalog_service_ci
+                COMMERCIAL_CATALOG_USE_INMEMORY: "0"
+                COMMERCIAL_CATALOG_AUTO_CREATE_SCHEMA: "1"
+                COMMERCIAL_CATALOG_SERVICE_TOKEN: ${SERVICE_TOKEN}
+                COMMERCIAL_CATALOG_COURSE_SERVICE_BASE_URL: http://course_service:8001
+                COMMERCIAL_CATALOG_COURSE_SERVICE_TOKEN: ${SERVICE_TOKEN}
+              depends_on:
+                postgres:
+                  condition: service_healthy
+              ports:
+                - "8007:8007"
           YAML
 
       - name: Start postgres
@@ -135,9 +152,10 @@ jobs:
           docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d postgres -c "CREATE DATABASE users_service_ci;" || true
           docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d postgres -c "CREATE DATABASE course_service_ci;" || true
           docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d postgres -c "CREATE DATABASE payments_service_ci;" || true
+          docker compose -f docker-compose.e2e.yml exec -T postgres psql -U postgres -d postgres -c "CREATE DATABASE commercial_catalog_service_ci;" || true
 
       - name: Start contour services
-        run: docker compose -f docker-compose.e2e.yml up -d auth_service users_service course_service payments_service
+        run: docker compose -f docker-compose.e2e.yml up -d auth_service users_service course_service commercial_catalog_service payments_service
 
       - name: Wait for service health endpoints
         run: |
@@ -161,6 +179,7 @@ jobs:
           wait_url "http://127.0.0.1:8000/healthz" "auth_service"
           wait_url "http://127.0.0.1:8002/healthz" "users_service"
           wait_url "http://127.0.0.1:8001/healthz" "course_service"
+          wait_url "http://127.0.0.1:8007/healthz" "commercial_catalog_service"
           wait_url "http://127.0.0.1:8004/healthz" "payments_service"
 
       - name: Run smoke
@@ -168,6 +187,7 @@ jobs:
           AUTH_BASE_URL: http://127.0.0.1:8000
           USERS_BASE_URL: http://127.0.0.1:8002
           COURSE_BASE_URL: http://127.0.0.1:8001
+          COMMERCIAL_CATALOG_BASE_URL: http://127.0.0.1:8007
           PAYMENTS_BASE_URL: http://127.0.0.1:8004
           SMOKE_PAYMENTS_ENABLED: "1"
           SERVICE_TOKEN: ${{ env.SERVICE_TOKEN }}

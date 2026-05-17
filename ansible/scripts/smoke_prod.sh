@@ -335,7 +335,7 @@ JSON
     PARENT_ME_OUT="${TMP_DIR}/parent.me.out.json"
     PARENT_ME_STATUS="$(request_json "GET" "${AUTH_BASE_URL}/v1/auth/me" "" "${PARENT_ME_OUT}" -H "Authorization: Bearer ${PARENT_ACCESS_TOKEN}")"
     assert_2xx "${PARENT_ME_STATUS}" "${PARENT_ME_OUT}" "parent auth me"
-    PAYMENT_PARENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["account_id"])' "${PARENT_ME_OUT}")"
+    PAYMENT_PARENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["user_id"])' "${PARENT_ME_OUT}")"
 
     log "Create parent in users_service"
     PARENT_PAYLOAD="${TMP_DIR}/parent.json"

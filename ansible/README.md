@@ -14,6 +14,7 @@ Most used targets:
 make deploy-target SERVICE=web_app
 make status-target SERVICE=payments_service
 make smoke SERVICE_TOKEN=...
+make smoke-student-invite-web PARENT_PASSWORD=...
 make backup-postgres
 make restore-drill BACKUP_DIR=...
 make restore-cleanup
@@ -44,6 +45,18 @@ SMOKE_PAYMENTS_ENABLED=1 \
 SMOKE_PAYMENTS_AUTO_CREATE_OFFER=1 \
 bash ./scripts/smoke_prod.sh
 ```
+
+Student invite web smoke:
+
+```bash
+WEB_BASE_URL=http://127.0.0.1:3000 \
+PARENT_EMAIL=test3parent@mail.com \
+PARENT_PASSWORD=... \
+make smoke-student-invite-web
+```
+
+This runs parent login, child creation, invite creation, invite acceptance, and
+child `/api/auth/me` through `web_app /api`.
 
 ## Load and chaos
 

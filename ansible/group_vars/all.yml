@@ -175,6 +175,9 @@ services:
       AUTH_JWT_PRIVATE_KEY_PEM: "{{ auth_jwt_private_key_pem }}"
       AUTH_JWT_PUBLIC_KEY_PEM: "{{ auth_jwt_public_key_pem }}"
       AUTH_METRICS_TOKEN: "{{ observability_metrics_token }}"
+      AUTH_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
+      AUTH_USERS_SERVICE_TOKEN: "{{ users_service_token }}"
+      AUTH_USERS_SERVICE_TIMEOUT_SECONDS: "5"
     migration_command:
       - alembic
       - upgrade

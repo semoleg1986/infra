@@ -46,6 +46,10 @@ SMOKE_PAYMENTS_AUTO_CREATE_OFFER=1 \
 bash ./scripts/smoke_prod.sh
 ```
 
+Payment smoke validates both the `payments_service` source-of-truth access
+grant and the `course_service` access projection used by student-facing course
+checks.
+
 Student invite web smoke:
 
 ```bash

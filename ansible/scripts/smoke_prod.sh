@@ -23,6 +23,8 @@ SMOKE_PAYMENTS_AUTO_CREATE_OFFER="${SMOKE_PAYMENTS_AUTO_CREATE_OFFER:-0}"
 SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD="${SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD:-}"
 SMOKE_PAYMENTS_COURSE_ID="${SMOKE_PAYMENTS_COURSE_ID:-}"
 SMOKE_PAYMENTS_OFFER_ID="${SMOKE_PAYMENTS_OFFER_ID:-}"
+SMOKE_COURSE_ACCESS_SYNC_ATTEMPTS="${SMOKE_COURSE_ACCESS_SYNC_ATTEMPTS:-10}"
+SMOKE_COURSE_ACCESS_SYNC_SLEEP_SECONDS="${SMOKE_COURSE_ACCESS_SYNC_SLEEP_SECONDS:-1}"
 SMOKE_LEARNING_LESSON1_ID="${SMOKE_LEARNING_LESSON1_ID:-}"
 SMOKE_LEARNING_LESSON2_ID="${SMOKE_LEARNING_LESSON2_ID:-}"
 
@@ -626,6 +628,42 @@ JSON
 
   log "payments_intent_id=${PAYMENT_INTENT_ID}"
   log "payments_access_grant_id=${ACCESS_GRANT_ID}"
+
+  log "Course access projection check from course_service"
+  COURSE_ACCESS_PAYLOAD="${TMP_DIR}/course_access_check.json"
+  cat > "${COURSE_ACCESS_PAYLOAD}" <<JSON
+{
+  "course_id": "${PAYMENT_COURSE_ID}",
+  "student_id": null,
+  "require_active_grant": true,
+  "require_enrollment": false
+}
+JSON
+  COURSE_ACCESS_OUT="${TMP_DIR}/course_access_check.out.json"
+  COURSE_ACCESS_OK="false"
+  COURSE_ACCESS_STATUS="000"
+  for attempt in $(seq 1 "${SMOKE_COURSE_ACCESS_SYNC_ATTEMPTS}"); do
+    COURSE_ACCESS_STATUS="$(request_json "POST" "${COURSE_BASE_URL}/internal/v1/access/check-by-token" "${COURSE_ACCESS_PAYLOAD}" "${COURSE_ACCESS_OUT}" -H "Authorization: Bearer ${STUDENT_ACCESS_TOKEN}" -H "Content-Type: application/json")"
+    if [[ "${COURSE_ACCESS_STATUS}" =~ ^2 ]]; then
+      COURSE_ACCESS_DECISION="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("decision",""))' "${COURSE_ACCESS_OUT}")"
+      COURSE_ACCESS_GRANT_STATUS="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("grant_status",""))' "${COURSE_ACCESS_OUT}")"
+      if [[ "${COURSE_ACCESS_DECISION}" == "allow" && "${COURSE_ACCESS_GRANT_STATUS}" == "approved" ]]; then
+        COURSE_ACCESS_OK="true"
+        break
+      fi
+    fi
+
+    if [[ "${attempt}" != "${SMOKE_COURSE_ACCESS_SYNC_ATTEMPTS}" ]]; then
+      sleep "${SMOKE_COURSE_ACCESS_SYNC_SLEEP_SECONDS}"
+    fi
+  done
+
+  if [[ "${COURSE_ACCESS_OK}" != "true" ]]; then
+    log "ERROR course_service access projection check failed after ${SMOKE_COURSE_ACCESS_SYNC_ATTEMPTS} attempts: HTTP ${COURSE_ACCESS_STATUS}"
+    cat "${COURSE_ACCESS_OUT}"
+    echo
+    exit 1
+  fi
 
   if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
     log "Check bonus balance after approve"

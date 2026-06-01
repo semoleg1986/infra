@@ -14,6 +14,7 @@ Most used targets:
 make deploy-target SERVICE=web_app
 make status-target SERVICE=payments_service
 make smoke SERVICE_TOKEN=...
+make smoke-problem-json SERVICE_TOKEN=...
 make smoke-student-invite-web PARENT_PASSWORD=...
 make backup-postgres
 make restore-drill BACKUP_DIR=...
@@ -49,6 +50,16 @@ bash ./scripts/smoke_prod.sh
 Payment smoke validates both the `payments_service` source-of-truth access
 grant and the `course_service` access projection used by student-facing course
 checks.
+
+Problem+json contract smoke:
+
+```bash
+make smoke-problem-json SERVICE_TOKEN=...
+```
+
+This validates backend error responses across core services:
+`application/problem+json`, `type`, `title`, `status`, `detail`, `instance`,
+`request_id`, `correlation_id`, `X-Request-ID`, and `X-Correlation-ID`.
 
 Student invite web smoke:
 

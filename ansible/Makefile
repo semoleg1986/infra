@@ -8,7 +8,7 @@ VARS := -e @group_vars/all.yml -e @group_vars/$(ENV).yml -e @group_vars/vault.ym
 ASK_FLAGS ?= --ask-vault-pass -K
 COMMON := ANSIBLE_ROLES_PATH=./roles ansible-playbook -i $(INVENTORY) -c local $(VARS) $(ASK_FLAGS)
 
-.PHONY: help ping deploy deploy-target rollback status status-target smoke smoke-student-invite-web backup-postgres backup-rotate restore-drill restore-cleanup ops-check dispatch-outbox dispatch-payments-outbox dispatch-course-outbox load-auth-burst load-auth-throttle-guard load-live-room-burst load-payment-access-progress load-payment-bonus-checkout load-payment-throttle-guard chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
+.PHONY: help ping deploy deploy-target rollback status status-target smoke smoke-problem-json smoke-student-invite-web backup-postgres backup-rotate restore-drill restore-cleanup ops-check dispatch-outbox dispatch-payments-outbox dispatch-course-outbox load-auth-burst load-auth-throttle-guard load-live-room-burst load-payment-access-progress load-payment-bonus-checkout load-payment-throttle-guard chaos-auth-restart chaos-users-restart chaos-payments-restart chaos-redis-live
 
 help:
 	@echo "make deploy                          # full deploy for ENV=$(ENV)"
@@ -17,6 +17,7 @@ help:
 	@echo "make status                          # docker compose status for all services"
 	@echo "make status-target SERVICE=users_service"
 	@echo "make smoke SERVICE_TOKEN=...         # run scripts/smoke_prod.sh"
+	@echo "make smoke-problem-json SERVICE_TOKEN=... # check error contract for backend services"
 	@echo "make smoke-student-invite-web PARENT_PASSWORD=... # run web invite onboarding smoke"
 	@echo "make backup-postgres                 # create dumps in ~/backups/postgres/<timestamp>"
 	@echo "make backup-rotate                   # rotate backup dirs by age/count"
@@ -67,6 +68,10 @@ status-target:
 smoke:
 	@test -n "$(SERVICE_TOKEN)" || (echo "SERVICE_TOKEN is required, e.g. make smoke SERVICE_TOKEN=sometokencourse" && exit 1)
 	SERVICE_TOKEN="$(SERVICE_TOKEN)" ./scripts/smoke_prod.sh
+
+smoke-problem-json:
+	@test -n "$(SERVICE_TOKEN)" || (echo "SERVICE_TOKEN is required, e.g. make smoke-problem-json SERVICE_TOKEN=sometokencourse" && exit 1)
+	SERVICE_TOKEN="$(SERVICE_TOKEN)" SMOKE_PROBLEM_JSON_ONLY=1 SMOKE_PAYMENTS_ENABLED=1 SMOKE_BONUS_ENABLED=1 SMOKE_ATTRIBUTION_ENABLED=1 ./scripts/smoke_prod.sh
 
 smoke-student-invite-web:
 	@test -n "$(PARENT_PASSWORD)" || (echo "PARENT_PASSWORD is required" && exit 1)

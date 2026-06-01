@@ -18,6 +18,7 @@ SMOKE_BONUS_COURSE_COMPLETION_POINTS="${SMOKE_BONUS_COURSE_COMPLETION_POINTS:-25
 SMOKE_LEARNING_ENABLED="${SMOKE_LEARNING_ENABLED:-1}"
 SMOKE_LIVE_ENABLED="${SMOKE_LIVE_ENABLED:-0}"
 SMOKE_ATTRIBUTION_ENABLED="${SMOKE_ATTRIBUTION_ENABLED:-0}"
+SMOKE_PROBLEM_JSON_ONLY="${SMOKE_PROBLEM_JSON_ONLY:-0}"
 SMOKE_PAYMENTS_PROVISION_RELATIONS="${SMOKE_PAYMENTS_PROVISION_RELATIONS:-1}"
 SMOKE_PAYMENTS_AUTO_CREATE_OFFER="${SMOKE_PAYMENTS_AUTO_CREATE_OFFER:-0}"
 SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD="${SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD:-}"
@@ -92,6 +93,162 @@ assert_2xx() {
   fi
 }
 
+assert_problem_json() {
+  # usage: assert_problem_json STEP METHOD URL EXPECTED_STATUS BODY_FILE [HEADER...]
+  local step="$1"
+  local method="$2"
+  local url="$3"
+  local expected_status="$4"
+  local body_file="$5"
+  shift 5
+
+  local out_file="${TMP_DIR}/problem-${step//[^a-zA-Z0-9_]/_}.json"
+  local headers_file="${TMP_DIR}/problem-${step//[^a-zA-Z0-9_]/_}.headers"
+  local meta
+  local status
+  local content_type
+
+  if [[ -n "${body_file}" ]]; then
+    meta="$(curl -sS -D "${headers_file}" -o "${out_file}" -w '%{http_code}|%{content_type}' -X "${method}" "${url}" "$@" --data-binary "@${body_file}")"
+  else
+    meta="$(curl -sS -D "${headers_file}" -o "${out_file}" -w '%{http_code}|%{content_type}' -X "${method}" "${url}" "$@")"
+  fi
+
+  status="${meta%%|*}"
+  content_type="${meta#*|}"
+
+  if [[ "${status}" != "${expected_status}" ]]; then
+    log "ERROR ${step}: expected HTTP ${expected_status}, got ${status}"
+    cat "${out_file}"
+    echo
+    exit 1
+  fi
+
+  if [[ "${content_type}" != application/problem+json* ]]; then
+    log "ERROR ${step}: expected application/problem+json, got ${content_type}"
+    cat "${out_file}"
+    echo
+    exit 1
+  fi
+
+  if ! grep -qi '^x-request-id:' "${headers_file}"; then
+    log "ERROR ${step}: missing X-Request-ID header"
+    cat "${headers_file}"
+    exit 1
+  fi
+
+  if ! grep -qi '^x-correlation-id:' "${headers_file}"; then
+    log "ERROR ${step}: missing X-Correlation-ID header"
+    cat "${headers_file}"
+    exit 1
+  fi
+
+  python3 - "${out_file}" "${expected_status}" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+expected_status = int(sys.argv[2])
+
+with open(path, encoding="utf-8") as fh:
+    payload = json.load(fh)
+
+required = [
+    "type",
+    "title",
+    "status",
+    "detail",
+    "instance",
+    "request_id",
+    "correlation_id",
+]
+missing = [field for field in required if field not in payload]
+if missing:
+    raise SystemExit(f"missing fields: {', '.join(missing)}")
+if payload["status"] != expected_status:
+    raise SystemExit(
+        f"status field mismatch: expected {expected_status}, got {payload['status']}"
+    )
+if not payload["request_id"]:
+    raise SystemExit("request_id is empty")
+if not payload["correlation_id"]:
+    raise SystemExit("correlation_id is empty")
+PY
+}
+
+run_problem_json_smoke() {
+  log "Problem+json error contract checks"
+
+  assert_problem_json \
+    "auth_service problem+json" \
+    "GET" \
+    "${AUTH_BASE_URL}/v1/auth/me" \
+    "401" \
+    "" \
+    -H "X-Request-ID: smoke-auth-problem" \
+    -H "X-Correlation-ID: smoke-auth-problem"
+
+  assert_problem_json \
+    "users_service problem+json" \
+    "GET" \
+    "${USERS_BASE_URL}/v1/parent/me/students" \
+    "401" \
+    "" \
+    -H "X-Request-ID: smoke-users-problem" \
+    -H "X-Correlation-ID: smoke-users-problem"
+
+  assert_problem_json \
+    "course_service problem+json" \
+    "GET" \
+    "${COURSE_BASE_URL}/internal/v1/access/courses/00000000-0000-0000-0000-000000000000/payment-snapshot" \
+    "401" \
+    "" \
+    -H "X-Request-ID: smoke-course-problem" \
+    -H "X-Correlation-ID: smoke-course-problem"
+
+  if [[ "${SMOKE_PAYMENTS_ENABLED}" == "1" ]]; then
+    assert_problem_json \
+      "payments_service problem+json" \
+      "GET" \
+      "${PAYMENTS_BASE_URL}/internal/v1/access/00000000-0000-0000-0000-000000000000/00000000-0000-0000-0000-000000000000" \
+      "401" \
+      "" \
+      -H "X-Request-ID: smoke-payments-problem" \
+      -H "X-Correlation-ID: smoke-payments-problem"
+
+    assert_problem_json \
+      "commercial_catalog_service problem+json" \
+      "GET" \
+      "${COMMERCIAL_CATALOG_BASE_URL}/internal/v1/offers/smoke-missing-offer" \
+      "401" \
+      "" \
+      -H "X-Request-ID: smoke-catalog-problem" \
+      -H "X-Correlation-ID: smoke-catalog-problem"
+  fi
+
+  if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
+    assert_problem_json \
+      "bonus_wallet_service problem+json" \
+      "GET" \
+      "${BONUS_BASE_URL}/internal/v1/bonus/balance/smoke-parent" \
+      "401" \
+      "" \
+      -H "X-Request-ID: smoke-bonus-problem" \
+      -H "X-Correlation-ID: smoke-bonus-problem"
+  fi
+
+  if [[ "${SMOKE_ATTRIBUTION_ENABLED}" == "1" ]]; then
+    assert_problem_json \
+      "attribution_service problem+json" \
+      "GET" \
+      "${ATTR_BASE_URL}/v1/internal/events/outbox" \
+      "401" \
+      "" \
+      -H "X-Request-ID: smoke-attr-problem" \
+      -H "X-Correlation-ID: smoke-attr-problem"
+  fi
+}
+
 is_already_active_access_error() {
   local status="$1"
   local body_file="$2"
@@ -146,6 +303,13 @@ if [[ "${SMOKE_ATTRIBUTION_ENABLED}" == "1" ]]; then
     log "ERROR health check failed for ${ATTR_BASE_URL}/healthz: HTTP ${code}"
     exit 1
   fi
+fi
+
+run_problem_json_smoke
+
+if [[ "${SMOKE_PROBLEM_JSON_ONLY}" == "1" ]]; then
+  log "OK problem+json error contract"
+  exit 0
 fi
 
 log "Admin login"

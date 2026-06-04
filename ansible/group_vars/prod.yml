@@ -14,6 +14,9 @@ db_suffix: _prod
 ops_cron_enabled: true
 prometheus_enabled: true
 grafana_enabled: true
+web_app_public_url: "{{ vault_web_app_public_url | default('http://82.202.157.9:3000') }}"
+admin_app_public_url: "{{ vault_admin_app_public_url | default('http://82.202.157.9:3001') }}"
+studio_app_public_url: "{{ vault_studio_app_public_url | default('http://82.202.157.9:3002') }}"
 
 # Runtime hardening (Sprint 5): default per-container limits for prod.
 service_default_resources:

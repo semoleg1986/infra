@@ -82,6 +82,9 @@ grafana_enabled: false
 api_public_bind_host: 0.0.0.0
 web_public_bind_host: 0.0.0.0
 observability_bind_host: 127.0.0.1
+web_app_public_url: http://localhost:3000
+admin_app_public_url: http://localhost:3001
+studio_app_public_url: http://localhost:3002
 
 services:
   prometheus:
@@ -437,7 +440,7 @@ services:
       NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
       NUXT_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"
-      NUXT_PUBLIC_SITE_URL: "http://localhost:3000"
+      NUXT_PUBLIC_SITE_URL: "{{ web_app_public_url }}"
     ports:
       - "{{ web_public_bind_host }}:3000:3000"
     healthcheck:
@@ -456,8 +459,10 @@ services:
       NUXT_COMMERCIAL_CATALOG_SERVICE_BASE_URL: "{{ commercial_catalog_service_internal_url }}"
       NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
       NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
+      NUXT_USERS_SERVICE_BASE_URL: "{{ users_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"
-      NUXT_PUBLIC_SITE_URL: "http://localhost:3001"
+      NUXT_PUBLIC_SITE_URL: "{{ admin_app_public_url }}"
+      NUXT_PUBLIC_STUDIO_SITE_URL: "{{ studio_app_public_url }}"
     ports:
       - "{{ web_public_bind_host }}:3001:3000"
     healthcheck:
@@ -477,7 +482,7 @@ services:
       NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
       NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"
-      NUXT_PUBLIC_SITE_URL: "http://localhost:3002"
+      NUXT_PUBLIC_SITE_URL: "{{ studio_app_public_url }}"
     ports:
       - "{{ web_public_bind_host }}:3002:3000"
     healthcheck:

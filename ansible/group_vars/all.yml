@@ -248,6 +248,9 @@ services:
       COURSE_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
       COURSE_BONUS_SERVICE_TOKEN: "{{ bonus_wallet_service_token }}"
       COURSE_BONUS_SERVICE_TIMEOUT_SECONDS: "2"
+      COURSE_COMMERCIAL_CATALOG_SERVICE_BASE_URL: "{{ commercial_catalog_service_internal_url }}"
+      COURSE_COMMERCIAL_CATALOG_SERVICE_TOKEN: "{{ commercial_catalog_service_token }}"
+      COURSE_COMMERCIAL_CATALOG_SERVICE_TIMEOUT_SECONDS: "2"
       COURSE_METRICS_TOKEN: "{{ observability_metrics_token }}"
     migration_command:
       - alembic
@@ -479,6 +482,7 @@ services:
       NUXT_AUTH_SERVICE_BASE_URL: "{{ auth_service_internal_url }}"
       NUXT_BONUS_SERVICE_BASE_URL: "{{ bonus_wallet_service_internal_url }}"
       NUXT_COMMERCIAL_CATALOG_SERVICE_BASE_URL: "{{ commercial_catalog_service_internal_url }}"
+      NUXT_COMMERCIAL_CATALOG_SERVICE_TOKEN: "{{ commercial_catalog_service_token }}"
       NUXT_COURSE_SERVICE_BASE_URL: "{{ course_service_internal_url }}"
       NUXT_PAYMENTS_SERVICE_BASE_URL: "{{ payments_service_internal_url }}"
       NUXT_PUBLIC_API_BASE_URL: "/api"

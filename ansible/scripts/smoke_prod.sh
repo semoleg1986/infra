@@ -737,6 +737,52 @@ SQL
 
   PAYMENT_COURSE_ID="${OFFER_COURSE_ID}"
 
+  log "Check course offer read model in commercial_catalog_service"
+  COURSE_OFFERS_OUT="${TMP_DIR}/course.offers.out.json"
+  COURSE_OFFERS_STATUS="$(request_json "GET" "${COMMERCIAL_CATALOG_BASE_URL}/internal/v1/courses/${PAYMENT_COURSE_ID}/offers" "" "${COURSE_OFFERS_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
+  assert_2xx "${COURSE_OFFERS_STATUS}" "${COURSE_OFFERS_OUT}" "list course offers"
+  python3 - "${COURSE_OFFERS_OUT}" "${PAYMENT_COURSE_ID}" "${PAYMENT_OFFER_ID}" <<'PY'
+import json
+import sys
+
+payload = json.load(open(sys.argv[1]))
+expected_course_id = sys.argv[2]
+expected_offer_id = sys.argv[3]
+if payload.get("course_id") != expected_course_id:
+    print(
+        "course offers course_id mismatch: "
+        f"expected {expected_course_id}, got {payload.get('course_id')}"
+    )
+    sys.exit(1)
+offers = payload.get("offers") or []
+if not any(
+    item.get("offer_id") == expected_offer_id and item.get("is_default") is True
+    for item in offers
+):
+    print(f"course offers missing default offer {expected_offer_id}")
+    sys.exit(1)
+PY
+
+  DEFAULT_OFFER_STATUS_OUT="${TMP_DIR}/course.default_offer_status.out.json"
+  DEFAULT_OFFER_STATUS_CODE="$(request_json "GET" "${COMMERCIAL_CATALOG_BASE_URL}/internal/v1/courses/${PAYMENT_COURSE_ID}/default-offer-status" "" "${DEFAULT_OFFER_STATUS_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
+  assert_2xx "${DEFAULT_OFFER_STATUS_CODE}" "${DEFAULT_OFFER_STATUS_OUT}" "default offer status"
+  python3 - "${DEFAULT_OFFER_STATUS_OUT}" "${PAYMENT_COURSE_ID}" <<'PY'
+import json
+import sys
+
+payload = json.load(open(sys.argv[1]))
+expected_course_id = sys.argv[2]
+if payload.get("course_id") != expected_course_id:
+    print(
+        "default offer status course_id mismatch: "
+        f"expected {expected_course_id}, got {payload.get('course_id')}"
+    )
+    sys.exit(1)
+if payload.get("has_active_default_offer") is not True:
+    print("course has no active default offer")
+    sys.exit(1)
+PY
+
   BONUS_REQUESTED_AMOUNT=0
   if [[ "${SMOKE_BONUS_ENABLED}" == "1" ]]; then
     BONUS_REQUESTED_AMOUNT=30

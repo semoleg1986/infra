@@ -386,6 +386,41 @@ if [[ -z "${COURSE_ID}" ]]; then
   echo
   exit 1
 fi
+python3 - "${COURSE_OUT}" <<'PY'
+import json
+import sys
+
+payload = json.load(open(sys.argv[1]))
+unexpected = [key for key in ("price", "currency", "is_free") if key in payload]
+if unexpected:
+    print(f"course response contains commercial fields: {unexpected}")
+    sys.exit(1)
+PY
+
+log "Check course payment snapshot contract"
+COURSE_PAYMENT_SNAPSHOT_OUT="${TMP_DIR}/course.payment_snapshot.out.json"
+COURSE_PAYMENT_SNAPSHOT_STATUS="$(request_json "GET" "${COURSE_BASE_URL}/internal/v1/access/courses/${COURSE_ID}/payment-snapshot" "" "${COURSE_PAYMENT_SNAPSHOT_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}")"
+assert_2xx "${COURSE_PAYMENT_SNAPSHOT_STATUS}" "${COURSE_PAYMENT_SNAPSHOT_OUT}" "course payment snapshot"
+python3 - "${COURSE_PAYMENT_SNAPSHOT_OUT}" "${COURSE_ID}" <<'PY'
+import json
+import sys
+
+payload = json.load(open(sys.argv[1]))
+expected_course_id = sys.argv[2]
+if payload.get("course_id") != expected_course_id:
+    print(
+        "course payment snapshot course_id mismatch: "
+        f"expected {expected_course_id}, got {payload.get('course_id')}"
+    )
+    sys.exit(1)
+unexpected = [key for key in ("price", "currency") if key in payload]
+if unexpected:
+    print(f"course payment snapshot contains commercial fields: {unexpected}")
+    sys.exit(1)
+if "access_ttl_days" not in payload:
+    print("course payment snapshot missing access_ttl_days")
+    sys.exit(1)
+PY
 
 log "Create published learning structure in course_service"
 MODULE_PAYLOAD="${TMP_DIR}/module.json"

@@ -331,6 +331,22 @@ if [[ -z "${ACCESS_TOKEN}" ]]; then
   log "ERROR admin login: access_token is empty"
   exit 1
 fi
+ADMIN_ACTOR_USER_ID="$(python3 - "${ACCESS_TOKEN}" <<'PY'
+import base64
+import json
+import sys
+
+token = sys.argv[1]
+try:
+    payload = token.split(".")[1]
+    payload += "=" * (-len(payload) % 4)
+    claims = json.loads(base64.urlsafe_b64decode(payload.encode()).decode())
+except Exception:
+    claims = {}
+
+print(claims.get("user_id") or claims.get("sub") or "smoke-admin")
+PY
+)"
 
 SMOKE_ID="$(date +%s)"
 TEACHER_USER_ID="teacher-smoke-${SMOKE_ID}"
@@ -637,7 +653,18 @@ JSON
 }
 JSON
       OFFER_CREATE_OUT="${TMP_DIR}/offer.create.out.json"
-      OFFER_CREATE_STATUS="$(request_json "POST" "${COMMERCIAL_CATALOG_BASE_URL}/internal/v1/course-offers" "${OFFER_CREATE_PAYLOAD}" "${OFFER_CREATE_OUT}" -H "X-Service-Token: ${SERVICE_TOKEN}" -H "Content-Type: application/json")"
+      OFFER_CREATE_STATUS="$(
+        request_json \
+          "POST" \
+          "${COMMERCIAL_CATALOG_BASE_URL}/internal/v1/course-offers" \
+          "${OFFER_CREATE_PAYLOAD}" \
+          "${OFFER_CREATE_OUT}" \
+          -H "X-Service-Token: ${SERVICE_TOKEN}" \
+          -H "X-Actor-User-Id: ${ADMIN_ACTOR_USER_ID}" \
+          -H "X-Actor-Roles: admin" \
+          -H "X-Actor-Email: ${ADMIN_EMAIL}" \
+          -H "Content-Type: application/json"
+      )"
       if [[ "${OFFER_CREATE_STATUS}" =~ ^2 ]]; then
         :
       elif [[ -n "${SMOKE_PAYMENTS_AUTO_CREATE_OFFER_PSQL_CMD}" ]]; then
